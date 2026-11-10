@@ -243,9 +243,15 @@
     const pass = state.passportNo || doc.passportNo || '';
     els.viewPassport.textContent = 'Hộ chiếu: ' + (pass || '—');
     const facePhoto = (state.selfie && !state.skipFace) ? state.selfie : null;
-    els.viewPhoto.src = facePhoto || '/assets/mascot.webp';
-    els.idcard.classList.add('has-photo');
-    els.viewPhoto.alt = facePhoto ? 'Ảnh khuôn mặt' : 'TravelQ';
+    if (facePhoto) {
+      els.viewPhoto.src = facePhoto;
+      els.viewPhoto.alt = 'Ảnh khuôn mặt';
+      els.idcard.classList.add('has-photo');
+    } else {
+      els.viewPhoto.removeAttribute('src');
+      els.viewPhoto.alt = '';
+      els.idcard.classList.remove('has-photo');
+    }
     renderQr(state.qrPayload);
   }
 
