@@ -46,7 +46,6 @@
     viewPhoto: $('#viewPhoto'),
     idcard: $('#idcard'),
     qrHost: $('#qrHost'),
-    cardBadge: $('#cardBadge'),
     saveStatus: $('#saveStatus'),
     stepper: $('#stepper'),
     stepTitle: $('#stepTitle'),
@@ -286,7 +285,6 @@
     if (!state.saved) {
       els.statusPill.textContent = 'CHƯA LƯU';
       els.statusPill.className = 'pill idle';
-      els.cardBadge.textContent = 'DRAFT';
     }
     updateCard();
     return fetchQr(nid);
@@ -1129,7 +1127,6 @@
       state.saved = true;
       els.statusPill.textContent = 'ĐÃ LƯU';
       els.statusPill.className = 'pill ok';
-      els.cardBadge.textContent = 'ACTIVE';
       updateCard();
       closeStepper();
       openSuccessView();

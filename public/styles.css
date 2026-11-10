@@ -87,7 +87,6 @@ a { color: #7fe3ec; }
   gap: 2px 12px;
   isolation: isolate;
   background:
-    url(/assets/rosette.svg) 112% -30% / 78% auto no-repeat,
     url(/assets/guilloche.svg) 0 0 / 100% 100% no-repeat,
     radial-gradient(500px 220px at 100% 0, #2fc6d3aa, transparent 60%),
     linear-gradient(140deg, #0e8794 0%, #09636e 48%, #0b1f33 100%);
@@ -103,13 +102,6 @@ a { color: #7fe3ec; }
 }
 
 .idcard .lg { height: clamp(18px, 5.5cqi, 26px); width: auto; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); justify-self: start; }
-.idcard .status-badge {
-  justify-self: end; align-self: center;
-  font-size: clamp(8px, 2.4cqi, 10px); font-weight: 800; letter-spacing: .08em;
-  padding: 3px 9px; border-radius: 99px;
-  background: linear-gradient(180deg, #ffe08f, #f5b82e); color: #3d2a00;
-  box-shadow: 0 2px 8px rgba(0,0,0,.25);
-}
 .idcard .lb {
   grid-column: 1 / -1; margin-top: 6px;
   font-size: clamp(8px, 2.6cqi, 11px); letter-spacing: .18em; font-weight: 800;
