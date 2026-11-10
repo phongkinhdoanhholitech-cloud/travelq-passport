@@ -58,13 +58,42 @@
     return body ? ('TQ ' + body) : '—';
   }
 
+
+  async function fetchWithRetry(url, options, { retries = 6, delay = 1500, timeout = 12000, onRetry } = {}) {
+    let lastErr;
+    for (let i = 0; i <= retries; i++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeout);
+      try {
+        const res = await fetch(url, { ...(options || {}), signal: ctrl.signal });
+        clearTimeout(timer);
+        if ([502, 503, 504, 521, 522, 523, 524].includes(res.status) && i < retries) {
+          if (onRetry) onRetry(i + 1);
+          await new Promise((r) => setTimeout(r, delay * Math.min(i + 1, 4)));
+          continue;
+        }
+        return res;
+      } catch (e) {
+        clearTimeout(timer);
+        lastErr = e;
+        if (i < retries) {
+          if (onRetry) onRetry(i + 1);
+          await new Promise((r) => setTimeout(r, delay * Math.min(i + 1, 4)));
+          continue;
+        }
+        throw lastErr;
+      }
+    }
+    throw lastErr || new Error('NETWORK');
+  }
+
   async function lookup(raw) {
     const q = encodeURIComponent(String(raw || '').trim());
     if (!q) { showStatus('err', 'Nhập ID hoặc payload QR.'); return; }
     showStatus('info', 'Đang tra cứu…');
     result.classList.remove('show');
     try {
-      const res = await fetch('/api/records/' + q);
+      const res = await fetchWithRetry('/api/records/' + q, {}, { retries: 6, delay: 1500, onRetry() { showStatus('info', 'Đang thử lại kết nối…'); } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'NOT_FOUND');
       fullCccd = data.cccd || '';

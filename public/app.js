@@ -82,15 +82,19 @@
     provinceGroup: $('#provinceGroup')
   };
 
+  function hideToast() {
+    if (!els.toast) return;
+    clearTimeout(toast._t);
+    els.toast.classList.remove('show');
+    els.toast.hidden = true;
+  }
+
   function toast(msg, ms = 2800) {
     els.toast.hidden = false;
     els.toast.classList.add('show');
     els.toast.textContent = msg;
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => {
-      els.toast.classList.remove('show');
-      els.toast.hidden = true;
-    }, ms);
+    toast._t = setTimeout(hideToast, ms);
   }
 
   function showStatus(type, text) {
@@ -134,7 +138,7 @@
     }).format(new Date()));
   }
 
-  const YEAR_HINT = 'Thiếu năm sinh';
+  const YEAR_HINT = 'Vui lòng nhập năm sinh.';
   function yearInvalidMsg() {
     return 'Năm sinh không hợp lệ. Nhập 4 chữ số từ 1900 đến ' + currentYearVN() + '.';
   }
@@ -255,11 +259,82 @@
     renderQr(state.qrPayload);
   }
 
+
+  async function fetchWithRetry(url, options, { retries = 6, delay = 1500, timeout = 12000, onRetry } = {}) {
+    let lastErr;
+    for (let i = 0; i <= retries; i++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeout);
+      try {
+        const res = await fetch(url, { ...(options || {}), signal: ctrl.signal });
+        clearTimeout(timer);
+        if ([502, 503, 504, 521, 522, 523, 524].includes(res.status) && i < retries) {
+          if (onRetry) onRetry(i + 1, retries);
+          await new Promise((r) => setTimeout(r, delay * Math.min(i + 1, 4)));
+          continue;
+        }
+        return res;
+      } catch (e) {
+        clearTimeout(timer);
+        lastErr = e;
+        if (i < retries) {
+          if (onRetry) onRetry(i + 1, retries);
+          await new Promise((r) => setTimeout(r, delay * Math.min(i + 1, 4)));
+          continue;
+        }
+        throw lastErr;
+      }
+    }
+    throw lastErr || new Error('NETWORK');
+  }
+
+  function showBoot(title, sub, { error } = {}) {
+    const ov = $('#bootOverlay');
+    if (!ov) return;
+    const t = $('#bootTitle');
+    const b = $('#bootSub');
+    const retry = $('#btnBootRetry');
+    if (t) t.textContent = title || 'Đang kết nối máy chủ…';
+    if (b) b.textContent = sub || 'Vui lòng chờ trong giây lát, máy chủ có thể đang khởi động.';
+    ov.classList.toggle('is-error', !!error);
+    if (retry) retry.hidden = !error;
+    ov.hidden = false;
+  }
+
+  function hideBoot() {
+    const ov = $('#bootOverlay');
+    if (ov) ov.hidden = true;
+  }
+
+  async function ensureServer() {
+    const slow = setTimeout(() => {
+      showBoot('Đang kết nối máy chủ…', 'Vui lòng chờ trong giây lát, máy chủ có thể đang khởi động.');
+    }, 500);
+    try {
+      const res = await fetchWithRetry('/api/health', {}, {
+        retries: 8,
+        delay: 1600,
+        timeout: 10000,
+        onRetry() {
+          showBoot('Đang kết nối máy chủ…', 'Máy chủ đang khởi động, đang thử lại…');
+        }
+      });
+      clearTimeout(slow);
+      if (!res.ok) throw new Error('HEALTH');
+      hideBoot();
+      return true;
+    } catch (e) {
+      clearTimeout(slow);
+      showBoot('Không kết nối được máy chủ', 'Vui lòng kiểm tra mạng và nhấn Thử lại. Máy chủ miễn phí có thể đang khởi động.', { error: true });
+      return false;
+    }
+  }
+
   async function fetchQr(id) {
     state.qrPayload = '';
     renderQr('');
     try {
-      const res = await fetch('/api/qr/' + encodeURIComponent(id));
+      const res = await fetchWithRetry('/api/qr/' + encodeURIComponent(id), {}, { retries: 6, delay: 1500 });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'QR_FAILED');
       state.qrPayload = data.qrPayload;
@@ -415,20 +490,30 @@
     return null;
   }
 
+  function mapGender(g) {
+    const s = String(g || '').trim();
+    const n = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (n === 'nam' || n === 'male' || n === 'm') return 'Nam';
+    if (n === 'nu' || n === 'female' || n === 'f') return 'Nữ';
+    return s;
+  }
+
   function parseCccdQr(raw) {
-    const parts = String(raw || '').split('|');
+    const text = String(raw || '').replace(/^\uFEFF/, '').trim();
+    const parts = text.split('|').map((part) => part.trim());
     if (parts.length < 7) return null;
-    const [soCccd, soCmnd, hoTen, ngaySinh, gioiTinh, diaChi, ngayCap] = parts;
-    if (!/^\d{9,12}$/.test(soCccd)) return null;
+    const [soCccd, soCmnd, hoTen, ngaySinh, gioiTinh, diaChi] = parts;
+    const cccd = String(soCccd || '').replace(/\s+/g, '');
+    if (!/^\d{9,12}$/.test(cccd)) return null;
     return {
-      cccd: soCccd,
+      cccd: /^\d{12}$/.test(cccd) ? cccd : '',
       name: (hoTen || '').trim(),
       dob: ddmmyyyyToYear(ngaySinh),
-      gender: (gioiTinh || '').trim(),
+      gender: mapGender(gioiTinh),
       address: (diaChi || '').trim(),
       province: matchProvince(diaChi),
       country: 'Việt Nam',
-      raw
+      raw: text
     };
   }
 
@@ -544,6 +629,7 @@
   }
 
   function showStep(n) {
+    hideToast();
     state.step = n;
     $$('.step').forEach((el) => { el.hidden = Number(el.dataset.step) !== n; });
     $$('.progress-seg').forEach((el) => {
@@ -667,6 +753,7 @@
   }
 
   function openConsent() {
+    hideToast();
     if (!els.consentOverlay) return;
     if (els.consentCheck) els.consentCheck.checked = false;
     const agree = $('#btnConsentAgree');
@@ -1056,10 +1143,7 @@
   }
 
   function openSuccessView() {
-    if (els.toast) {
-      els.toast.hidden = true;
-      els.toast.classList.remove('show');
-    }
+    hideToast();
     document.body.classList.add('success-view');
     if (els.successView) els.successView.hidden = false;
     if (els.successCopy) els.successCopy.hidden = false;
@@ -1099,7 +1183,7 @@
     showStatus('info', 'Đang mã hoá & lưu…');
     $('#btnFinishSave').disabled = true;
     try {
-      const res = await fetch('/api/records', {
+      const res = await fetchWithRetry('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1124,7 +1208,7 @@
           kyc: kycStatus(),
           source: state.source || 'manual'
         })
-      });
+      }, { retries: 5, delay: 1600, timeout: 20000, onRetry() { showStatus('info', 'Đang thử lại kết nối…'); } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.hint || 'SAVE_FAILED');
       state.qrPayload = data.qrPayload || state.qrPayload;
@@ -1154,6 +1238,10 @@
     showStep,
     getState: () => state,
     doSave,
+    exportCardPng,
+    fetchWithRetry,
+    parseBirthYear,
+    mapGender,
     openSuccessView,
     dismissSuccessView,
     notifyHostClose,
@@ -1294,9 +1382,12 @@
     } catch { showStatus('info', state.accountId); }
   });
 
-  $('#btnPng').addEventListener('click', async () => {
+  async function exportCardPng() {
+    if (!els.idcard) return;
     showStatus('info', 'Đang xuất PNG…');
+    els.idcard.classList.add('exporting');
     try {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const canvas = await html2canvas(els.idcard, { backgroundColor: null, scale: 3, useCORS: true, logging: false });
       const out = document.createElement('canvas');
       out.width = 1476; out.height = 1039;
@@ -1306,10 +1397,16 @@
       a.href = out.toDataURL('image/png');
       a.click();
       showStatus('ok', 'Đã tải PNG.');
+      return out.toDataURL('image/png');
     } catch (e) {
       showStatus('err', 'Xuất PNG lỗi: ' + (e.message || e));
+      return null;
+    } finally {
+      els.idcard.classList.remove('exporting');
     }
-  });
+  }
+
+  $('#btnPng').addEventListener('click', () => exportCardPng());
 
   els.inputAccountId.addEventListener('change', () => setAccount({ id: els.inputAccountId.value, name: $('#inputName').value }));
   els.inputAccountId.addEventListener('blur', () => {
@@ -1322,7 +1419,9 @@
   $('#inputCountry').value = 'Việt Nam';
   updateCountryMode();
 
-  (async function boot() {
+  async function startApp() {
+    const ok = await ensureServer();
+    if (!ok) return;
     const params = new URLSearchParams(location.search);
     const urlId = params.get('id') || params.get('accountId');
     const urlName = params.get('name') || '';
@@ -1334,5 +1433,7 @@
       els.accountBanner.textContent = 'Demo: nhập/đổi ID tài khoản (mặc định 017715)';
       await setAccount({ id: '017715', name: 'Dinh Dinh' });
     }
-  })();
+  }
+  if ($('#btnBootRetry')) $('#btnBootRetry').addEventListener('click', () => startApp());
+  startApp();
 })();

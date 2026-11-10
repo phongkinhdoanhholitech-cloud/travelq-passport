@@ -9,6 +9,14 @@
   <link rel="icon" href="/assets/logo-white.png" />
 </head>
 <body>
+  <div class="boot-overlay" id="bootOverlay" hidden>
+    <div class="boot-card" role="status" aria-live="polite" aria-busy="true">
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <p class="boot-title" id="bootTitle">Đang kết nối máy chủ…</p>
+      <p class="boot-sub" id="bootSub">Vui lòng chờ trong giây lát, máy chủ có thể đang khởi động.</p>
+      <button type="button" class="btn btn-teal" id="btnBootRetry" hidden>Thử lại</button>
+    </div>
+  </div>
   <div class="success-chrome" id="successView" hidden>
     <button type="button" class="success-x" id="btnSuccessClose" aria-label="Đóng">×</button>
   </div>
@@ -64,7 +72,7 @@
       <button type="button" class="btn btn-teal" id="btnPng">⬇️ Tải thẻ PNG (300 dpi)</button>
       <button type="button" class="btn btn-ghost" id="btnCopy">📋 Sao chép ID</button>
     </div>
-    <div class="status" id="saveStatus"></div>
+    <div class="status" id="saveStatus" role="status" aria-live="polite"></div>
 
     <div class="form-group" id="accountIdGroup" style="margin-top:14px">
       <label for="inputAccountId">ID tài khoản (demo)</label>
@@ -124,8 +132,8 @@
           <button type="button" class="thumb-retake" id="btnBackRetake" aria-label="Chụp lại CCCD mặt sau">↻ Chụp lại</button>
         </div>
       </div>
-      <input type="file" id="inputFront" accept="image/*" hidden />
-      <input type="file" id="inputBack" accept="image/*" hidden />
+      <input type="file" id="inputFront" accept="image/*" hidden aria-label="Chọn ảnh CCCD mặt trước" />
+      <input type="file" id="inputBack" accept="image/*" hidden aria-label="Chọn ảnh CCCD mặt sau" />
 
       <div class="scan-live" id="scanLiveWrap" hidden>
         <video id="scanVideo" playsinline muted></video>
@@ -197,7 +205,7 @@
       </div>
       <div class="form-group">
         <label for="inputPhone">Số điện thoại</label>
-        <input id="inputPhone" type="tel" inputmode="tel" placeholder="09xxxxxxxx" />
+        <input id="inputPhone" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="09xxxxxxxx" autocomplete="tel" />
       </div>
       <div class="actions">
         <button type="button" class="btn btn-teal" id="btnStep2Next">Tiếp tục →</button>
@@ -246,7 +254,7 @@
         <button type="button" class="btn btn-gold btn-lg" id="btnFinishSave">Hoàn tất &amp; Lưu</button>
         <button type="button" class="btn-text" id="btnSkipFace">Bỏ qua</button>
       </div>
-      <input type="file" id="inputSelfieFile" accept="image/*" hidden />
+      <input type="file" id="inputSelfieFile" accept="image/*" hidden aria-label="Tải ảnh khuôn mặt" />
     </section>
   </div>
 
@@ -305,7 +313,7 @@
     </div>
   </div>
 
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 
   <script src="/vendor/qrcode.js"></script>
   <script src="/vendor/jsQR.js"></script>
