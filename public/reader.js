@@ -28,6 +28,19 @@
     return m ? m[1] : '—';
   }
 
+  function formatDateTimeVi(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    const parts = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Saigon',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(d);
+    const get = (t) => (parts.find((p) => p.type === t) || {}).value || '';
+    return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`;
+  }
+
   function mask(cccd) {
     const s = String(cccd || '');
     if (!s) return '—';
@@ -69,6 +82,14 @@
       $('#lrPhone').textContent = data.phoneMasked || data.phone || '—';
       $('#lrKyc').textContent = data.kyc || 'skipped';
       if ($('#lrSource')) $('#lrSource').textContent = data.source || 'manual';
+      if ($('#lrFaceConsent')) {
+        if (data.faceConsent) {
+          const when = formatDateTimeVi(data.faceConsentAt);
+          $('#lrFaceConsent').textContent = when ? ('Có · ' + when) : 'Có';
+        } else {
+          $('#lrFaceConsent').textContent = 'Không';
+        }
+      }
       $('#lrSig').textContent = data.signatureVerified ? 'Hợp lệ ✓' : 'Không có / chưa kiểm';
       $('#lrCccd').textContent = data.cccdMasked || mask(fullCccd);
       $('#btnReveal').textContent = 'Hiện';

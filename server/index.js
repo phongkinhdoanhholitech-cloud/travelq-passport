@@ -229,7 +229,11 @@ async function main() {
         cccdFrontDataUrl: cccdFront,
         cccdBackDataUrl: cccdBack,
         selfieDataUrl: selfie,
-        photoDataUrl: clipDataUrl(body.photoDataUrl, 1_500_000),
+        photoDataUrl: clipDataUrl(body.photoDataUrl, 1_500_000) || selfie,
+        faceConsent: body.faceConsent === true || body.faceConsent === 'true',
+        faceConsentAt: (body.faceConsent === true || body.faceConsent === 'true')
+          ? (String(body.faceConsentAt || '').trim() || savedAt)
+          : '',
         kyc,
         source,
         savedAt
@@ -291,7 +295,9 @@ async function main() {
         cccdFrontDataUrl: record.cccdFrontDataUrl || null,
         cccdBackDataUrl: record.cccdBackDataUrl || null,
         selfieDataUrl: record.selfieDataUrl || null,
-        photoDataUrl: record.photoDataUrl || null,
+        photoDataUrl: record.photoDataUrl || record.selfieDataUrl || null,
+        faceConsent: !!record.faceConsent,
+        faceConsentAt: record.faceConsentAt || '',
         kyc: record.kyc || 'skipped',
         source: record.source || 'manual',
         createdAt: row.created_at,

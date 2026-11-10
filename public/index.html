@@ -27,7 +27,7 @@
 
     <div class="card-stage">
       <div class="card-wrap">
-        <div class="idcard" id="idcard" aria-label="Thẻ TravelQ ID">
+        <div class="idcard has-photo" id="idcard" aria-label="Thẻ TravelQ ID">
           <img class="lg" src="/assets/logo-white.webp" alt="travelQ" width="72" height="26" />
           <span class="status-badge" id="cardBadge">DRAFT</span>
           <div class="lb">Mã định danh du lịch toàn cầu</div>
@@ -47,7 +47,7 @@
             <div class="submeta" id="viewPassport">Hộ chiếu: —</div>
           </div>
           <div class="qr" id="qrHost" title="QR = account ID + HMAC"></div>
-          <div class="photo"><img id="viewPhoto" alt="" /></div>
+          <div class="photo"><img id="viewPhoto" alt="TravelQ" src="/assets/mascot.webp" /></div>
         </div>
       </div>
     </div>
@@ -181,18 +181,12 @@
       </div>
       <div class="form-group">
         <label for="inputDocNo">Số CCCD hoặc Hộ chiếu <span class="req">*</span></label>
-        <input id="inputDocNo" type="text" maxlength="12" placeholder="079123456789 hoặc C1234567" autocomplete="off" spellcheck="false" />
+        <input id="inputDocNo" type="text" maxlength="12" placeholder="" autocomplete="off" spellcheck="false" />
         <div class="hint" id="hintCccd"></div>
       </div>
       <div class="form-group">
         <label for="inputPhone">Số điện thoại</label>
         <input id="inputPhone" type="tel" inputmode="tel" placeholder="09xxxxxxxx" />
-      </div>
-      <div class="form-group">
-        <label>Ảnh chân dung <em>(tuỳ chọn)</em></label>
-        <button type="button" class="btn btn-ghost btn-block" id="btnPhoto">🖼️ Chọn từ thư viện</button>
-        <input type="file" id="photoInput" accept="image/*" hidden />
-        <img id="photoPreview" alt="" class="mini-preview" hidden />
       </div>
       <div class="actions">
         <button type="button" class="btn btn-teal" id="btnStep2Next">Tiếp tục →</button>
@@ -200,28 +194,100 @@
     </section>
 
     <!-- STEP 3: FACE -->
-    <section class="step" id="step3" data-step="3" hidden>
-      <h2>Nhận diện khuôn mặt</h2>
-      <p class="step-desc">Căn mặt vào oval, chụp selfie. Có thể bỏ qua.</p>
-      <div class="selfie-wrap" id="selfieWrap">
-        <video id="selfieVideo" playsinline muted></video>
-        <canvas id="selfieCanvas" style="display:none"></canvas>
-        <div class="selfie-oval" aria-hidden="true"></div>
-        <img id="selfiePreview" alt="Selfie" hidden />
+    <section class="step step-face" id="step3" data-step="3" hidden>
+      <div class="face-stage" id="faceStage" data-mode="live">
+        <div class="selfie-wrap is-placeholder" id="selfieWrap">
+          <video id="selfieVideo" playsinline muted></video>
+          <canvas id="selfieCanvas" hidden></canvas>
+          <img id="selfiePreview" alt="Ảnh khuôn mặt" hidden />
+          <div class="selfie-mask" aria-hidden="true"></div>
+          <div class="selfie-oval-ring" aria-hidden="true"></div>
+        </div>
+        <p class="face-guide" id="faceGuide">Đưa khuôn mặt vào khung oval, nhìn thẳng, đủ sáng</p>
       </div>
-      <div class="hint" id="hintFace">FaceDetector dùng khi trình duyệt hỗ trợ — không bắt buộc</div>
-      <div class="actions tight">
-        <button type="button" class="btn btn-teal" id="btnSelfieCam">📷 Bật camera trước</button>
-        <button type="button" class="btn btn-gold" id="btnSelfieSnap" disabled>Chụp</button>
-        <button type="button" class="btn btn-ghost" id="btnSelfieRetake" hidden>Chụp lại</button>
-        <button type="button" class="btn btn-ghost" id="btnSelfieFile">📁 Chọn ảnh</button>
-        <input type="file" id="inputSelfieFile" accept="image/*" capture="user" hidden />
+
+      <div class="face-live-actions" id="faceLiveActions">
+        <button type="button" class="btn-upload-link" id="btnSelfieFile">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M12 16V4" stroke-linecap="round"/>
+            <path d="M7.5 8.5 12 4l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5" stroke-linecap="round"/>
+          </svg>
+          Tải ảnh lên
+        </button>
+        <button type="button" class="shutter" id="btnSelfieSnap" aria-label="Chụp ảnh" disabled>
+          <span class="shutter-ring"></span>
+          <span class="shutter-core"></span>
+        </button>
+        <div class="shutter-label">Chụp ảnh</div>
       </div>
-      <div class="actions">
-        <button type="button" class="btn btn-gold" id="btnFinishSave">🔐 Hoàn tất &amp; Lưu</button>
-        <button type="button" class="btn btn-ghost" id="btnSkipFace">Bỏ qua</button>
+
+      <div class="face-preview-actions" id="facePreviewActions" hidden>
+        <button type="button" class="btn btn-ghost" id="btnSelfieRetake">Chụp lại</button>
+        <button type="button" class="btn btn-teal" id="btnSelfieUse">Dùng ảnh này</button>
       </div>
+
+      <div class="face-footer">
+        <button type="button" class="btn btn-gold btn-lg" id="btnFinishSave">Hoàn tất &amp; Lưu</button>
+        <button type="button" class="btn-text" id="btnSkipFace">Bỏ qua</button>
+      </div>
+      <input type="file" id="inputSelfieFile" accept="image/*" hidden />
     </section>
+  </div>
+
+  <div class="sheet-overlay" id="consentOverlay" hidden>
+    <div class="consent-sheet" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+      <div class="consent-handle" aria-hidden="true"></div>
+      <div class="consent-icon" aria-hidden="true">
+        <svg viewBox="0 0 72 72" width="72" height="72">
+          <circle cx="36" cy="36" r="34" fill="rgba(47,198,211,.12)" stroke="rgba(47,198,211,.45)" stroke-width="2"/>
+          <ellipse cx="36" cy="30" rx="12" ry="14" fill="none" stroke="#7fe3ec" stroke-width="2.2"/>
+          <path d="M18 56c3.5-11 13-16 18-16s14.5 5 18 16" fill="none" stroke="#7fe3ec" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M14 28h6M52 28h6M16 22l5 4M56 22l-5 4" stroke="#f5b82e" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 id="consentTitle">Xác thực khuôn mặt TravelQ</h2>
+      <p class="consent-body">TravelQ sử dụng hình ảnh khuôn mặt để xác thực danh tính, bảo vệ ID du lịch và giúp bạn sử dụng các dịch vụ trong hệ sinh thái TravelQ nhanh chóng, thuận tiện hơn mà không cần nhập lại thông tin nhiều lần.</p>
+      <div class="consent-info">
+        <div class="consent-info-row">
+          <span class="ci-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 3 5 6.5v5.2c0 4.4 3 8.2 7 9.3 4-1.1 7-4.9 7-9.3V6.5L12 3z" stroke-linejoin="round"/>
+              <path d="M9 12.2 11 14l4-4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>Dữ liệu khuôn mặt được bảo vệ và chỉ sử dụng cho các mục đích bạn đồng ý.</span>
+        </div>
+        <div class="consent-info-row">
+          <span class="ci-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M4 7h16" stroke-linecap="round"/>
+              <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/>
+              <path d="M7 7l.8 12.2A1.5 1.5 0 0 0 9.3 20.5h5.4a1.5 1.5 0 0 0 1.5-1.3L17 7" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>Bạn có quyền yêu cầu xóa dữ liệu khuôn mặt bất cứ lúc nào. TravelQ sẽ xử lý yêu cầu theo quy định pháp luật.</span>
+        </div>
+      </div>
+      <label class="consent-check">
+        <input type="checkbox" id="consentCheck" />
+        <span>Tôi đồng ý cho TravelQ xử lý dữ liệu khuôn mặt để xác thực ID du lịch theo <a href="#chinh-sach-bao-ve-du-lieu" id="linkPrivacyPolicy">Chính sách bảo vệ dữ liệu cá nhân</a></span>
+      </label>
+      <button type="button" class="btn btn-gold btn-lg" id="btnConsentAgree" disabled>Đồng ý &amp; Tiếp tục chụp ảnh</button>
+      <button type="button" class="btn-text" id="btnConsentSkip">Bỏ qua</button>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" id="policyOverlay" hidden>
+    <div class="policy-modal" role="dialog" aria-modal="true" aria-labelledby="policyTitle">
+      <h2 id="policyTitle">Chính sách bảo vệ dữ liệu cá nhân</h2>
+      <div class="policy-body">
+        <p>TravelQ (Holitech) thu thập và xử lý dữ liệu khuôn mặt chỉ để xác thực danh tính gắn với ID du lịch của bạn, bảo vệ tài khoản và giúp bạn sử dụng các dịch vụ trong hệ sinh thái TravelQ.</p>
+        <p>Dữ liệu được mã hoá, không dùng cho quảng cáo, và chỉ lưu trong thời gian cần thiết. Bạn có quyền xem, chỉnh sửa hoặc yêu cầu xoá dữ liệu khuôn mặt bất cứ lúc nào theo quy định pháp luật hiện hành.</p>
+        <p>Nội dung này là bản tóm tắt để bạn xác nhận đồng ý trong ứng dụng. Phiên bản đầy đủ sẽ được cập nhật khi chính sách chính thức được ban hành.</p>
+      </div>
+      <button type="button" class="btn btn-teal" id="btnPolicyClose">Đã hiểu</button>
+    </div>
   </div>
 
   <div class="toast" id="toast" hidden></div>

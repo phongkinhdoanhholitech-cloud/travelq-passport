@@ -20,9 +20,12 @@
     cccdFront: null,
     cccdBack: null,
     selfie: null,
+    selfieAccepted: false,
     photo: null,
     skipCccd: false,
     skipFace: false,
+    faceConsent: false,
+    faceConsentAt: '',
     source: 'manual',
     issueDate: '',
     passportNo: '',
@@ -51,7 +54,6 @@
     toast: $('#toast'),
     hintQr: $('#hintQr'),
     hintCccd: $('#hintCccd'),
-    hintFace: $('#hintFace'),
     boxFront: $('#boxFront'),
     boxBack: $('#boxBack'),
     previewFront: $('#previewFront'),
@@ -62,7 +64,13 @@
     selfieVideo: $('#selfieVideo'),
     selfieCanvas: $('#selfieCanvas'),
     selfiePreview: $('#selfiePreview'),
-    photoPreview: $('#photoPreview'),
+    selfieWrap: $('#selfieWrap'),
+    faceGuide: $('#faceGuide'),
+    faceLiveActions: $('#faceLiveActions'),
+    facePreviewActions: $('#facePreviewActions'),
+    consentOverlay: $('#consentOverlay'),
+    policyOverlay: $('#policyOverlay'),
+    consentCheck: $('#consentCheck'),
     province: $('#inputProvince'),
     provinceText: $('#inputProvinceText'),
     provinceGroup: $('#provinceGroup')
@@ -228,10 +236,10 @@
     const doc = parseDocNo($('#inputDocNo') && $('#inputDocNo').value);
     const pass = state.passportNo || doc.passportNo || '';
     els.viewPassport.textContent = 'Hộ chiếu: ' + (pass || '—');
-    if (state.photo) {
-      els.viewPhoto.src = state.photo;
-      els.idcard.classList.add('has-photo');
-    }
+    const facePhoto = (state.selfie && !state.skipFace) ? state.selfie : null;
+    els.viewPhoto.src = facePhoto || '/assets/mascot.webp';
+    els.idcard.classList.add('has-photo');
+    els.viewPhoto.alt = facePhoto ? 'Ảnh khuôn mặt' : 'TravelQ';
     renderQr(state.qrPayload);
   }
 
@@ -539,7 +547,7 @@
       clearDocHint();
     }
     if (n === 3) {
-      // auto-try front camera
+      enterFaceStep();
     }
   }
 
@@ -581,6 +589,161 @@
     return null;
   }
 
+  function setFaceMode(mode) {
+    const live = mode === 'live';
+    if (els.faceLiveActions) els.faceLiveActions.hidden = !live;
+    if (els.facePreviewActions) els.facePreviewActions.hidden = live;
+    if (els.selfieWrap) {
+      els.selfieWrap.classList.toggle('live', live && !!state.selfieStream);
+      els.selfieWrap.classList.toggle('preview', !live);
+    }
+    if (els.faceGuide) {
+      els.faceGuide.textContent = live
+        ? 'Đưa khuôn mặt vào khung oval, nhìn thẳng, đủ sáng'
+        : (state.selfieAccepted ? 'Đã chọn ảnh này cho thẻ ID' : 'Xem lại ảnh, chụp lại hoặc dùng ảnh này');
+    }
+  }
+
+  function enterFaceStep() {
+    if (state.selfie && state.selfieAccepted) {
+      showFacePreview();
+      return;
+    }
+    if (state.faceConsent) {
+      startSelfieCam();
+      return;
+    }
+    openConsent();
+  }
+
+  function openConsent() {
+    if (!els.consentOverlay) return;
+    if (els.consentCheck) els.consentCheck.checked = false;
+    const agree = $('#btnConsentAgree');
+    if (agree) agree.disabled = true;
+    els.consentOverlay.hidden = false;
+    stopSelfie();
+    setFaceMode('live');
+    if (els.selfieWrap) els.selfieWrap.classList.add('is-placeholder');
+  }
+
+  function closeConsent() {
+    if (els.consentOverlay) els.consentOverlay.hidden = true;
+  }
+
+  function openPolicy(e) {
+    if (e) e.preventDefault();
+    if (els.policyOverlay) els.policyOverlay.hidden = false;
+  }
+
+  function closePolicy() {
+    if (els.policyOverlay) els.policyOverlay.hidden = true;
+  }
+
+  function acceptConsent() {
+    state.faceConsent = true;
+    state.faceConsentAt = new Date().toISOString();
+    state.skipFace = false;
+    closeConsent();
+    startSelfieCam();
+  }
+
+  function skipFaceFromConsent() {
+    closeConsent();
+    skipFaceStep();
+  }
+
+  function skipFaceStep() {
+    state.skipFace = true;
+    state.selfie = null;
+    state.selfieAccepted = false;
+    stopSelfie();
+    if (els.selfiePreview) {
+      els.selfiePreview.hidden = true;
+      els.selfiePreview.removeAttribute('src');
+    }
+    if (els.selfieWrap) {
+      els.selfieWrap.classList.add('is-placeholder');
+      els.selfieWrap.classList.remove('live', 'preview');
+    }
+    setFaceMode('live');
+    if (els.faceGuide) els.faceGuide.textContent = 'Đã bỏ qua nhận diện khuôn mặt. Bạn vẫn có thể lưu hồ sơ.';
+    if (els.faceLiveActions) els.faceLiveActions.hidden = true;
+    updateCard();
+  }
+
+  async function startSelfieCam() {
+    setFaceMode('live');
+    if (els.selfiePreview) els.selfiePreview.hidden = true;
+    const snap = $('#btnSelfieSnap');
+    if (snap) snap.disabled = true;
+    try {
+      stopSelfie();
+      state.selfieStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } }
+      });
+      els.selfieVideo.srcObject = state.selfieStream;
+      els.selfieVideo.style.display = 'block';
+      await els.selfieVideo.play();
+      if (els.selfieWrap) {
+        els.selfieWrap.classList.add('live');
+        els.selfieWrap.classList.remove('is-placeholder', 'preview');
+      }
+      if (snap) snap.disabled = false;
+    } catch (e) {
+      if (els.selfieWrap) els.selfieWrap.classList.add('is-placeholder');
+      toast('Không mở được camera. Bạn có thể tải ảnh lên.');
+    }
+  }
+
+  function showFacePreview() {
+    stopSelfie();
+    if (els.selfiePreview && state.selfie) {
+      els.selfiePreview.src = state.selfie;
+      els.selfiePreview.hidden = false;
+    }
+    if (els.selfieWrap) {
+      els.selfieWrap.classList.add('preview');
+      els.selfieWrap.classList.remove('live', 'is-placeholder');
+    }
+    setFaceMode('preview');
+  }
+
+  async function captureSelfieFromVideo() {
+    const v = els.selfieVideo;
+    if (!v || !v.videoWidth) return;
+    const c = els.selfieCanvas;
+    c.width = v.videoWidth;
+    c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    const raw = c.toDataURL('image/jpeg', 0.92);
+    const blob = await (await fetch(raw)).blob();
+    state.selfie = await compressFile(new File([blob], 'selfie.jpg', { type: 'image/jpeg' }), 1200, 0.85);
+    state.skipFace = false;
+    state.selfieAccepted = false;
+    showFacePreview();
+  }
+
+  async function setSelfieFromFile(file) {
+    if (!file) return;
+    state.selfie = await compressFile(file, 1200, 0.85);
+    state.skipFace = false;
+    state.selfieAccepted = false;
+    state.faceConsent = state.faceConsent || true;
+    if (!state.faceConsentAt) state.faceConsentAt = new Date().toISOString();
+    closeConsent();
+    showFacePreview();
+  }
+
+  function useCapturedSelfie() {
+    if (!state.selfie) return;
+    state.selfieAccepted = true;
+    state.skipFace = false;
+    updateCard();
+    if (els.faceGuide) els.faceGuide.textContent = 'Đã chọn ảnh này cho thẻ ID';
+  }
+
   function kycStatus() {
     const hasFront = !!state.cccdFront && !state.skipCccd;
     const hasBack = !!state.cccdBack && !state.skipCccd;
@@ -595,22 +758,11 @@
       state.selfieStream.getTracks().forEach((t) => t.stop());
       state.selfieStream = null;
     }
-    els.selfieVideo.style.display = 'none';
-  }
-
-  async function maybeFaceCheck(dataUrl) {
-    if (!('FaceDetector' in window)) {
-      els.hintFace.textContent = 'FaceDetector không có — đã lưu selfie.';
-      return;
+    if (els.selfieVideo) {
+      els.selfieVideo.style.display = 'none';
+      els.selfieVideo.srcObject = null;
     }
-    try {
-      const det = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-      const img = await createImageBitmap(await (await fetch(dataUrl)).blob());
-      const faces = await det.detect(img);
-      els.hintFace.textContent = (faces && faces.length) ? 'Phát hiện khuôn mặt ✓' : 'Không thấy mặt rõ — vẫn có thể lưu.';
-    } catch {
-      els.hintFace.textContent = 'Không kiểm tra được mặt — vẫn lưu.';
-    }
+    if (els.selfieWrap) els.selfieWrap.classList.remove('live');
   }
 
   async function doSave() {
@@ -645,7 +797,9 @@
           cccdFrontDataUrl: state.skipCccd ? null : state.cccdFront,
           cccdBackDataUrl: state.skipCccd ? null : state.cccdBack,
           selfieDataUrl: state.skipFace ? null : state.selfie,
-          photoDataUrl: state.photo,
+          photoDataUrl: state.skipFace ? null : (state.selfie || null),
+          faceConsent: !!state.faceConsent,
+          faceConsentAt: state.faceConsent ? (state.faceConsentAt || new Date().toISOString()) : '',
           kyc: kycStatus(),
           source: state.source || 'manual'
         })
@@ -680,6 +834,20 @@
     showStep,
     getState: () => state,
     doSave,
+    openConsent,
+    closeConsent,
+    acceptConsent,
+    skipFaceStep,
+    setFaceMode,
+    startSelfieCam,
+    showFacePreview,
+    useCapturedSelfie,
+    setSelfieFromDataUrl: async (dataUrl) => {
+      state.selfie = dataUrl;
+      state.skipFace = false;
+      state.selfieAccepted = false;
+      showFacePreview();
+    },
     setCccdFrontDataUrl: async (dataUrl) => {
       state.cccdFront = dataUrl;
       els.previewFront.src = dataUrl;
@@ -746,76 +914,42 @@
     $('#' + id).addEventListener('change', updateCard);
   });
 
-  $('#btnPhoto').addEventListener('click', () => $('#photoInput').click());
-  $('#photoInput').addEventListener('change', async () => {
-    const f = $('#photoInput').files && $('#photoInput').files[0];
-    if (!f) return;
-    state.photo = await compressFile(f, 1200, 0.85);
-    els.photoPreview.src = state.photo;
-    els.photoPreview.hidden = false;
-    updateCard();
-  });
+  if ($('#btnConsentAgree')) {
+    $('#consentCheck').addEventListener('change', () => {
+      $('#btnConsentAgree').disabled = !$('#consentCheck').checked;
+    });
+    $('#btnConsentAgree').addEventListener('click', acceptConsent);
+    $('#btnConsentSkip').addEventListener('click', skipFaceFromConsent);
+  }
+  if ($('#linkPrivacyPolicy')) {
+    $('#linkPrivacyPolicy').addEventListener('click', openPolicy);
+  }
+  if ($('#btnPolicyClose')) {
+    $('#btnPolicyClose').addEventListener('click', closePolicy);
+  }
+  if ($('#policyOverlay')) {
+    $('#policyOverlay').addEventListener('click', (ev) => {
+      if (ev.target === els.policyOverlay) closePolicy();
+    });
+  }
 
-  $('#btnSelfieCam').addEventListener('click', async () => {
-    try {
-      stopSelfie();
-      state.selfieStream = await navigator.mediaDevices.getUserMedia({
-        audio: false, video: { facingMode: 'user' }
-      });
-      els.selfieVideo.srcObject = state.selfieStream;
-      els.selfieVideo.style.display = 'block';
-      els.selfiePreview.hidden = true;
-      await els.selfieVideo.play();
-      $('#btnSelfieSnap').disabled = false;
-      $('#btnSelfieRetake').hidden = true;
-    } catch (e) {
-      toast('Không mở camera: ' + (e.message || e));
-    }
-  });
-
-  $('#btnSelfieSnap').addEventListener('click', async () => {
-    const v = els.selfieVideo;
-    if (!v.videoWidth) return;
-    const c = els.selfieCanvas;
-    c.width = v.videoWidth; c.height = v.videoHeight;
-    c.getContext('2d').drawImage(v, 0, 0);
-    const raw = c.toDataURL('image/jpeg', 0.92);
-    const blob = await (await fetch(raw)).blob();
-    state.selfie = await compressFile(new File([blob], 'selfie.jpg', { type: 'image/jpeg' }), 1200, 0.85);
-    state.skipFace = false;
-    els.selfiePreview.src = state.selfie;
-    els.selfiePreview.hidden = false;
-    stopSelfie();
-    $('#btnSelfieRetake').hidden = false;
-    $('#btnSelfieSnap').disabled = true;
-    await maybeFaceCheck(state.selfie);
-  });
-
+  $('#btnSelfieSnap').addEventListener('click', () => captureSelfieFromVideo());
   $('#btnSelfieRetake').addEventListener('click', () => {
     state.selfie = null;
-    els.selfiePreview.hidden = true;
-    $('#btnSelfieCam').click();
+    state.selfieAccepted = false;
+    if (els.selfiePreview) els.selfiePreview.hidden = true;
+    startSelfieCam();
   });
-
+  if ($('#btnSelfieUse')) {
+    $('#btnSelfieUse').addEventListener('click', useCapturedSelfie);
+  }
   $('#btnSelfieFile').addEventListener('click', () => $('#inputSelfieFile').click());
   $('#inputSelfieFile').addEventListener('change', async () => {
     const f = $('#inputSelfieFile').files && $('#inputSelfieFile').files[0];
-    if (!f) return;
-    state.selfie = await compressFile(f, 1200, 0.85);
-    state.skipFace = false;
-    els.selfiePreview.src = state.selfie;
-    els.selfiePreview.hidden = false;
-    stopSelfie();
-    $('#btnSelfieRetake').hidden = false;
-    await maybeFaceCheck(state.selfie);
+    await setSelfieFromFile(f);
   });
 
-  $('#btnSkipFace').addEventListener('click', () => {
-    state.skipFace = true;
-    state.selfie = null;
-    stopSelfie();
-    doSave();
-  });
+  $('#btnSkipFace').addEventListener('click', skipFaceStep);
   $('#btnFinishSave').addEventListener('click', doSave);
 
   $('#btnCopy').addEventListener('click', async () => {
