@@ -52,6 +52,11 @@
     stepTitle: $('#stepTitle'),
     stepAccountId: $('#stepAccountId'),
     toast: $('#toast'),
+    successView: $('#successView'),
+    successFooter: $('#successFooter'),
+    successCopy: $('#successCopy'),
+    faceStage: $('#faceStage'),
+    btnSkipFace: $('#btnSkipFace'),
     hintQr: $('#hintQr'),
     hintCccd: $('#hintCccd'),
     boxFront: $('#boxFront'),
@@ -290,7 +295,8 @@
   window.TravelQ = {
     setAccount: (obj) => { window.__tqFromBridge = true; return setAccount(obj || {}); },
     getAccountId: () => state.accountId,
-    getQrPayload: () => state.qrPayload
+    getQrPayload: () => state.qrPayload,
+    onClose: null
   };
   window.addEventListener('message', (ev) => {
     const d = ev.data;
@@ -574,20 +580,52 @@
     return true;
   }
 
+  function clearFieldErrors() {
+    $$('#step2 .form-group.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
+  }
+
+  function markInvalid(input) {
+    if (!input) return;
+    const group = input.closest('.form-group');
+    if (group) group.classList.add('is-invalid');
+  }
+
+  function returnToStep2(msg) {
+    toast(msg);
+    showStep(2);
+    const first = $('#step2 .form-group.is-invalid input, #step2 .form-group.is-invalid select, #step2 .form-group.is-invalid textarea');
+    if (first) {
+      try { first.focus({ preventScroll: true }); } catch (_) { first.focus(); }
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
   function validateStep2() {
-    const name = ($('#inputName').value || '').trim();
-    const birth = parseBirthYear($('#inputDob') && $('#inputDob').value);
-    const address = ($('#inputAddress').value || '').trim();
-    const country = ($('#inputCountry').value || '').trim();
+    clearFieldErrors();
+    const nameEl = $('#inputName');
+    const dobEl = $('#inputDob');
+    const addrEl = $('#inputAddress');
+    const countryEl = $('#inputCountry');
+    const docEl = $('#inputDocNo');
+    const name = (nameEl && nameEl.value || '').trim();
+    const birth = parseBirthYear(dobEl && dobEl.value);
+    const address = (addrEl && addrEl.value || '').trim();
+    const country = (countryEl && countryEl.value || '').trim();
     const isVN = /^vi[eệ]t\s*nam$/i.test(country);
-    const province = isVN ? (els.province.value || '') : (els.provinceText.value || '').trim();
-    if (!name) return 'Thiếu họ và tên';
-    if (!birth.ok) return birth.error;
-    if (!address) return 'Thiếu nơi ở / địa chỉ';
-    if (!country) return 'Thiếu quốc gia';
-    if (isVN && !province) return 'Chọn tỉnh/thành phố';
-    if (!isVN && !province) return 'Nhập tỉnh/thành (nước ngoài)';
-    if (!validateDoc()) return parseDocNo($('#inputDocNo') && $('#inputDocNo').value).error || DOC_HINT;
+    const provinceEl = isVN ? els.province : els.provinceText;
+    const province = isVN ? (els.province.value || '') : ((els.provinceText.value || '').trim());
+    if (!name) { markInvalid(nameEl); return 'Vui lòng nhập họ và tên.'; }
+    if (!birth.ok) { markInvalid(dobEl); return birth.error || 'Vui lòng nhập năm sinh hợp lệ.'; }
+    if (!address) { markInvalid(addrEl); return 'Vui lòng nhập nơi ở / địa chỉ.'; }
+    if (!country) { markInvalid(countryEl); return 'Vui lòng nhập quốc gia.'; }
+    if (!province) {
+      markInvalid(provinceEl);
+      return isVN ? 'Vui lòng chọn tỉnh/thành phố.' : 'Vui lòng nhập tỉnh/thành (nước ngoài).';
+    }
+    if (!validateDoc()) {
+      markInvalid(docEl);
+      return parseDocNo(docEl && docEl.value).error || DOC_INVALID;
+    }
     return null;
   }
 
@@ -607,8 +645,14 @@
   }
 
   function enterFaceStep() {
+    if (els.btnSkipFace) els.btnSkipFace.hidden = false;
+    if (els.faceStage) els.faceStage.classList.remove('is-skipped');
     if (state.selfie && state.selfieAccepted) {
       showFacePreview();
+      return;
+    }
+    if (state.skipFace) {
+      skipFaceStep();
       return;
     }
     if (state.faceConsent) {
@@ -669,8 +713,14 @@
       els.selfieWrap.classList.remove('live', 'preview');
     }
     setFaceMode('live');
-    if (els.faceGuide) els.faceGuide.textContent = 'Đã bỏ qua nhận diện khuôn mặt. Bạn vẫn có thể lưu hồ sơ.';
     if (els.faceLiveActions) els.faceLiveActions.hidden = true;
+    if (els.facePreviewActions) els.facePreviewActions.hidden = true;
+    if (els.btnSkipFace) els.btnSkipFace.hidden = true;
+    if (els.faceStage) els.faceStage.classList.add('is-skipped');
+    if (els.faceGuide) {
+      els.faceGuide.textContent = 'Đã bỏ qua nhận diện khuôn mặt. Bạn vẫn có thể lưu hồ sơ.';
+      els.faceGuide.style.textAlign = 'center';
+    }
     updateCard();
   }
 
@@ -984,12 +1034,60 @@
     if (els.selfieWrap) els.selfieWrap.classList.remove('live');
   }
 
+
+  function notifyHostClose() {
+    const payload = { type: 'travelq:close' };
+    try {
+      if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*');
+    } catch (_) {}
+    try { window.postMessage(payload, '*'); } catch (_) {}
+    try {
+      if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+      }
+    } catch (_) {}
+    try {
+      if (window.TravelQ && typeof window.TravelQ.onClose === 'function') window.TravelQ.onClose();
+    } catch (_) {}
+  }
+
+  function openSuccessView() {
+    if (els.toast) {
+      els.toast.hidden = true;
+      els.toast.classList.remove('show');
+    }
+    document.body.classList.add('success-view');
+    if (els.successView) els.successView.hidden = false;
+    if (els.successCopy) els.successCopy.hidden = false;
+    if (els.successFooter) els.successFooter.hidden = false;
+    const card = els.idcard;
+    if (card) {
+      card.classList.remove('saved-pop');
+      void card.offsetWidth;
+      card.classList.add('saved-pop');
+      requestAnimationFrame(() => {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  }
+
+  function dismissSuccessView() {
+    document.body.classList.remove('success-view');
+    if (els.successView) els.successView.hidden = true;
+    if (els.successCopy) els.successCopy.hidden = true;
+    if (els.successFooter) els.successFooter.hidden = true;
+    if (els.idcard) els.idcard.classList.remove('saved-pop');
+    notifyHostClose();
+  }
+
   async function doSave() {
-    if (!state.accountId) return showStatus('err', 'Thiếu ID tài khoản.');
+    if (!state.accountId) {
+      toast('Thiếu ID tài khoản. Mở trang với ?id=… hoặc gắn từ ứng dụng.');
+      return;
+    }
     const err = validateStep2();
     if (err) {
-      toast(err);
-      showStep(2);
+      returnToStep2(err);
       return;
     }
     const isVN = /^vi[eệ]t\s*nam$/i.test(($('#inputCountry').value || '').trim());
@@ -1034,8 +1132,8 @@
       els.cardBadge.textContent = 'ACTIVE';
       updateCard();
       closeStepper();
-      showStatus('ok', 'Đã lưu hồ sơ ' + displayId(state.accountId) + ' · KYC ' + kycStatus());
-      toast('ĐÃ LƯU');
+      openSuccessView();
+      showStatus('ok', 'Đã lưu hồ sơ ' + displayId(state.accountId));
     } catch (e) {
       showStatus('err', 'Lưu thất bại: ' + (e.message || e));
       toast('Lưu thất bại: ' + (e.message || e));
@@ -1053,6 +1151,9 @@
     showStep,
     getState: () => state,
     doSave,
+    openSuccessView,
+    dismissSuccessView,
+    notifyHostClose,
     openConsent,
     closeConsent,
     acceptConsent,
@@ -1114,7 +1215,14 @@
 
   $('#btnStep2Next').addEventListener('click', () => {
     const err = validateStep2();
-    if (err) return toast(err);
+    if (err) {
+      const first = $('#step2 .form-group.is-invalid input, #step2 .form-group.is-invalid select, #step2 .form-group.is-invalid textarea');
+      if (first) {
+        try { first.focus({ preventScroll: true }); } catch (_) { first.focus(); }
+        first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return toast(err);
+    }
     showStep(3);
   });
 
@@ -1172,6 +1280,8 @@
 
   $('#btnSkipFace').addEventListener('click', skipFaceStep);
   $('#btnFinishSave').addEventListener('click', doSave);
+  if ($('#btnSuccessDone')) $('#btnSuccessDone').addEventListener('click', dismissSuccessView);
+  if ($('#btnSuccessClose')) $('#btnSuccessClose').addEventListener('click', dismissSuccessView);
 
   $('#btnCopy').addEventListener('click', async () => {
     if (!state.accountId) return showStatus('err', 'Chưa có ID.');

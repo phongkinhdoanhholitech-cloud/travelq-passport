@@ -9,6 +9,9 @@
   <link rel="icon" href="/assets/logo-white.png" />
 </head>
 <body>
+  <div class="success-chrome" id="successView" hidden>
+    <button type="button" class="success-x" id="btnSuccessClose" aria-label="Đóng">×</button>
+  </div>
   <div class="page" id="mainPage">
     <header class="topbar">
       <img class="logo" src="/assets/logo-white.webp" alt="TravelQ" width="94" height="34" />
@@ -52,6 +55,11 @@
       </div>
     </div>
 
+    <div class="success-copy" id="successCopy" hidden>
+      <h2 class="success-heading">Cập nhật ID thành công! 🎉</h2>
+      <p class="success-body">ID du lịch TravelQ của bạn đã được cập nhật. Giờ đây, bạn có thể sử dụng một ID duy nhất để mua vé tham quan, đặt khách sạn, thuê xe và trải nghiệm nhiều dịch vụ du lịch trong hệ sinh thái TravelQ mà không cần nhập lại thông tin cá nhân.</p>
+    </div>
+
     <div class="actions">
       <button type="button" class="btn btn-gold btn-lg" id="btnUpdate">✏️ Cập nhật thông tin</button>
       <button type="button" class="btn btn-teal" id="btnPng">⬇️ Tải thẻ PNG (300 dpi)</button>
@@ -74,6 +82,10 @@
       <a href="/reader.html">Mở Reader (quét QR / tra cứu)</a>
     </div>
     <footer class="footer">© TravelQ · Account-linked ID · AES-GCM server</footer>
+  </div>
+
+  <div class="success-footer" id="successFooter" hidden>
+    <button type="button" class="btn btn-gold btn-lg btn-block" id="btnSuccessDone">Xong</button>
   </div>
 
   <!-- ===== FULL-SCREEN STEPPER ===== -->

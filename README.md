@@ -34,6 +34,38 @@ Optional public HTTPS (on a machine with open egress):
 - QR payload: `TQ565240199.<10-char HMAC>` (base64url). Reader verifies signature when present; bare ID still works for lookup.
 - Server generates a unique ID on **Lưu hồ sơ**.
 
+
+## Embedding in the TravelQ app
+
+The passport page is designed to run inside the TravelQ mobile WebView (and also standalone in a browser).
+
+**Pass the signed-in account in** (do not mint a new ID):
+
+- Query string: `https://travelq-passport.onrender.com/?id=017715&name=Dinh%20Dinh`
+- JavaScript bridge: `window.TravelQ.setAccount({ id: '017715', name: 'Dinh Dinh' })`
+- `postMessage` to the page: `{ type: 'travelq:setAccount', id: '017715', name: 'Dinh Dinh' }`
+
+The host may also read `window.TravelQ.getAccountId()` and `window.TravelQ.getQrPayload()`.
+
+**Close after a successful save.** The result screen shows the digital ID card, a success message, a close (×) control and a **Xong** button. Tapping either dismisses the success chrome and returns to the normal home screen with the updated card still visible. The page also notifies the native host so it can close the WebView if it wants:
+
+- `window.parent.postMessage({ type: 'travelq:close' }, '*')` (and the same payload on `window` itself)
+- If present, `window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'travelq:close' }))`
+- If the host assigned a hook, `window.TravelQ.onClose()` is called
+
+Example (native / WebView):
+
+```js
+window.TravelQ.onClose = () => {
+  // close the WebView or pop the screen
+};
+window.addEventListener('message', (ev) => {
+  if (ev.data && ev.data.type === 'travelq:close') {
+    // same close action
+  }
+});
+```
+
 ## Encryption (server)
 - Env `TRAVELQ_DATA_KEY` = 32-byte key (64 hex chars).
 - Record JSON (`id,name,cccd,passportNo,nationality,issueDate,photoDataUrl,savedAt`) encrypted with **AES-256-GCM** (random IV).
