@@ -68,6 +68,47 @@ function todayISO(timeZone = 'Asia/Saigon') {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+function currentYearVN(timeZone = 'Asia/Saigon') {
+  return Number(new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric'
+  }).format(new Date()));
+}
+
+function parseBirthYear(raw) {
+  const s = String(raw || '').trim();
+  let y = '';
+  const iso = s.match(/^(\d{4})(?:-\d{2}-\d{2})?$/);
+  if (iso) y = iso[1];
+  const dmy = s.match(/^(\d{2})(\d{2})(\d{4})$/);
+  if (!y && dmy) y = dmy[3];
+  if (!y) {
+    const digits = s.replace(/\D/g, '');
+    if (digits.length === 4) y = digits;
+  }
+  if (!y) {
+    const hasDigits = /\d/.test(s);
+    return {
+      ok: false,
+      empty: !hasDigits,
+      year: '',
+      error: hasDigits
+        ? `Năm sinh không hợp lệ. Nhập 4 chữ số từ 1900 đến ${currentYearVN()}.`
+        : 'Thiếu năm sinh'
+    };
+  }
+  const n = Number(y);
+  const max = currentYearVN();
+  if (!/^\d{4}$/.test(y) || n < 1900 || n > max) {
+    return { ok: false, empty: false, year: '', error: `Năm sinh không hợp lệ. Nhập 4 chữ số từ 1900 đến ${max}.` };
+  }
+  return { ok: true, empty: false, year: y, error: '' };
+}
+
+function displayYear(raw) {
+  const m = String(raw || '').match(/^(\d{4})/);
+  return m ? m[1] : '';
+}
+
 async function main() {
   await db.init();
   const app = express();
@@ -96,7 +137,7 @@ async function main() {
         return res.status(400).json({ error: 'INVALID_ID_FORMAT', hint: '4–20 chars A-Z/0-9' });
       }
       const name = String(body.name || '').trim();
-      const dob = String(body.dob || '').trim();
+      const birth = parseBirthYear(body.dob);
       const address = String(body.address || '').trim();
       const phone = String(body.phone || '').trim();
       const gender = String(body.gender || '').trim();
@@ -147,7 +188,13 @@ async function main() {
         return res.status(400).json({ error: 'DOC_REQUIRED', hint: DOC_HINT });
       }
       if (!name) return res.status(400).json({ error: 'NAME_REQUIRED' });
-      if (!dob) return res.status(400).json({ error: 'DOB_REQUIRED' });
+      if (!birth.ok) {
+        return res.status(400).json({
+          error: birth.empty ? 'DOB_REQUIRED' : 'DOB_INVALID',
+          hint: birth.error
+        });
+      }
+      const dob = birth.year;
       if (!address) return res.status(400).json({ error: 'ADDRESS_REQUIRED' });
       if (!country) return res.status(400).json({ error: 'COUNTRY_REQUIRED' });
       const isVN = /^vi[eệ]t\s*nam$/i.test(country);
@@ -232,7 +279,7 @@ async function main() {
         nationality: record.nationality || '',
         issueDate: record.issueDate || record.savedAt || row.updated_at || '',
         savedAt: record.savedAt || row.updated_at || '',
-        dob: record.dob || '',
+        dob: displayYear(record.dob),
         address: record.address || '',
         phone: record.phone || '',
         phoneMasked: maskPhone(record.phone),

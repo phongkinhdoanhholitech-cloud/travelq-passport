@@ -114,10 +114,43 @@
     return { ok: false, empty: false, value: v, cccd: '', passportNo: '', error: DOC_INVALID };
   }
 
-  function ddmmyyyyToIso(s) {
+  function currentYearVN() {
+    return Number(new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Saigon', year: 'numeric'
+    }).format(new Date()));
+  }
+
+  const YEAR_HINT = 'Thiếu năm sinh';
+  function yearInvalidMsg() {
+    return 'Năm sinh không hợp lệ. Nhập 4 chữ số từ 1900 đến ' + currentYearVN() + '.';
+  }
+
+  function parseBirthYear(raw) {
+    const s = String(raw || '').trim();
+    let y = '';
+    const iso = s.match(/^(\d{4})(?:-\d{2}-\d{2})?$/);
+    if (iso) y = iso[1];
+    const dmy = s.match(/^(\d{2})(\d{2})(\d{4})$/);
+    if (!y && dmy) y = dmy[3];
+    if (!y) {
+      const digits = s.replace(/\D/g, '');
+      if (digits.length === 4) y = digits;
+    }
+    if (!y) {
+      const hasDigits = /\d/.test(s);
+      return { ok: false, empty: !hasDigits, year: '', error: hasDigits ? yearInvalidMsg() : YEAR_HINT };
+    }
+    const n = Number(y);
+    const max = currentYearVN();
+    if (!/^\d{4}$/.test(y) || n < 1900 || n > max) {
+      return { ok: false, empty: false, year: '', error: yearInvalidMsg() };
+    }
+    return { ok: true, empty: false, year: y, error: '' };
+  }
+
+  function ddmmyyyyToYear(s) {
     const m = String(s || '').match(/^(\d{2})(\d{2})(\d{4})$/);
-    if (!m) return '';
-    return `${m[3]}-${m[2]}-${m[1]}`;
+    return m ? m[3] : '';
   }
 
   function fillProvinces() {
@@ -370,7 +403,7 @@
     return {
       cccd: soCccd,
       name: (hoTen || '').trim(),
-      dob: ddmmyyyyToIso(ngaySinh),
+      dob: ddmmyyyyToYear(ngaySinh),
       gender: (gioiTinh || '').trim(),
       address: (diaChi || '').trim(),
       province: matchProvince(diaChi),
@@ -390,7 +423,7 @@
     $('#inputCountry').value = 'Việt Nam';
     updateCountryMode();
     if (parsed.province) els.province.value = parsed.province;
-    updateDocHint();
+    clearDocHint();
     updateCard();
     toast('Đã lấy thông tin từ QR CCCD');
     els.hintQr.textContent = 'Đã quét QR CCCD ✓ — ' + parsed.name;
@@ -503,40 +536,48 @@
     if (n === 2) {
       els.stepAccountId.textContent = 'ID: ' + displayId(state.accountId) + '  (' + state.accountId + ')';
       updateCountryMode();
-      updateDocHint();
+      clearDocHint();
     }
     if (n === 3) {
       // auto-try front camera
     }
   }
 
-  function updateDocHint() {
-    const doc = parseDocNo($('#inputDocNo') && $('#inputDocNo').value);
+  function clearDocHint() {
+    if (!els.hintCccd) return;
     els.hintCccd.classList.remove('ok', 'warn');
-    if (!doc.ok) {
-      els.hintCccd.textContent = doc.error;
-      els.hintCccd.classList.add('warn');
-      return false;
-    }
-    els.hintCccd.textContent = doc.kind === 'cccd' ? 'CCCD ✓' : 'Hộ chiếu ✓';
-    els.hintCccd.classList.add('ok');
+    els.hintCccd.textContent = '';
+  }
+
+  function showDocError(msg) {
+    if (!els.hintCccd) return false;
+    els.hintCccd.classList.remove('ok');
+    els.hintCccd.classList.add('warn');
+    els.hintCccd.textContent = msg || '';
+    return false;
+  }
+
+  function validateDoc() {
+    const doc = parseDocNo($('#inputDocNo') && $('#inputDocNo').value);
+    if (!doc.ok) return showDocError(doc.error);
+    clearDocHint();
     return true;
   }
 
   function validateStep2() {
     const name = ($('#inputName').value || '').trim();
-    const dob = $('#inputDob').value || '';
+    const birth = parseBirthYear($('#inputDob') && $('#inputDob').value);
     const address = ($('#inputAddress').value || '').trim();
     const country = ($('#inputCountry').value || '').trim();
     const isVN = /^vi[eệ]t\s*nam$/i.test(country);
     const province = isVN ? (els.province.value || '') : (els.provinceText.value || '').trim();
     if (!name) return 'Thiếu họ và tên';
-    if (!dob) return 'Thiếu ngày sinh';
+    if (!birth.ok) return birth.error;
     if (!address) return 'Thiếu nơi ở / địa chỉ';
     if (!country) return 'Thiếu quốc gia';
     if (isVN && !province) return 'Chọn tỉnh/thành phố';
     if (!isVN && !province) return 'Nhập tỉnh/thành (nước ngoài)';
-    if (!updateDocHint()) return parseDocNo($('#inputDocNo') && $('#inputDocNo').value).error || DOC_HINT;
+    if (!validateDoc()) return parseDocNo($('#inputDocNo') && $('#inputDocNo').value).error || DOC_HINT;
     return null;
   }
 
@@ -594,7 +635,7 @@
           docNo: ($('#inputDocNo').value || '').trim(),
           cccd: parseDocNo($('#inputDocNo').value).cccd,
           passportNo: parseDocNo($('#inputDocNo').value).passportNo,
-          dob: $('#inputDob').value || '',
+          dob: parseBirthYear($('#inputDob').value).year,
           address: ($('#inputAddress').value || '').trim(),
           phone: ($('#inputPhone').value || '').trim(),
           gender: $('#inputGender').value || '',
@@ -693,8 +734,12 @@
   $('#inputDocNo').addEventListener('input', () => {
     const el = $('#inputDocNo');
     el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-    updateDocHint();
+    clearDocHint();
     updateCard();
+  });
+  $('#inputDob').addEventListener('input', () => {
+    const el = $('#inputDob');
+    el.value = el.value.replace(/\D/g, '').slice(0, 4);
   });
   ['inputName', 'inputDob', 'inputCountry'].forEach((id) => {
     $('#' + id).addEventListener('input', updateCard);

@@ -22,6 +22,12 @@
     return `${m[3]}/${m[2]}/${m[1]}`;
   }
 
+  function formatBirthYear(v) {
+    if (!v) return '—';
+    const m = String(v).match(/^(\d{4})/);
+    return m ? m[1] : '—';
+  }
+
   function mask(cccd) {
     const s = String(cccd || '');
     if (!s) return '—';
@@ -52,7 +58,7 @@
       revealed = false;
       $('#lrId').textContent = data.displayId || displayId(data.id);
       $('#lrName').textContent = data.name || '—';
-      $('#lrDob').textContent = formatDateVi(data.dob);
+      $('#lrDob').textContent = formatBirthYear(data.dob);
       if ($('#lrGender')) $('#lrGender').textContent = data.gender || '—';
       $('#lrPassport').textContent = data.passportNo || '—';
       $('#lrNationality').textContent = data.nationality || data.country || '—';

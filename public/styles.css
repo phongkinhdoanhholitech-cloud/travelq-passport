@@ -229,6 +229,7 @@ a { color: #7fe3ec; }
 }
 .form-group input:focus { border-color: #2fc6d3; box-shadow: 0 0 0 3px rgba(47,198,211,.2); }
 .hint { font-size: .72rem; color: #7a9eae; margin-top: 4px; line-height: 1.35; }
+.hint:empty { display: none; }
 .hint.warn { color: #e0b35a; }
 .hint.ok { color: #6ecf9a; }
 .note {
