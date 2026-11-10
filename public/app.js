@@ -66,6 +66,8 @@
     selfiePreview: $('#selfiePreview'),
     selfieWrap: $('#selfieWrap'),
     faceGuide: $('#faceGuide'),
+    faceMesh: $('#faceMesh'),
+    faceAuth: $('#faceAuth'),
     faceLiveActions: $('#faceLiveActions'),
     facePreviewActions: $('#facePreviewActions'),
     consentOverlay: $('#consentOverlay'),
@@ -672,6 +674,216 @@
     updateCard();
   }
 
+
+  const FACE_PTS = [
+    [0.13,0.30],[0.14,0.38],[0.15,0.46],[0.17,0.54],[0.20,0.62],[0.24,0.70],[0.30,0.77],[0.39,0.83],
+    [0.50,0.87],
+    [0.61,0.83],[0.70,0.77],[0.76,0.70],[0.80,0.62],[0.83,0.54],[0.85,0.46],[0.86,0.38],[0.87,0.30],
+    [0.22,0.28],[0.28,0.24],[0.35,0.23],[0.42,0.25],[0.47,0.28],
+    [0.53,0.28],[0.58,0.25],[0.65,0.23],[0.72,0.24],[0.78,0.28],
+    [0.50,0.32],[0.50,0.39],[0.50,0.46],[0.50,0.53],
+    [0.40,0.58],[0.45,0.60],[0.50,0.61],[0.55,0.60],[0.60,0.58],
+    [0.30,0.35],[0.34,0.32],[0.39,0.32],[0.43,0.35],[0.39,0.37],[0.34,0.37],
+    [0.57,0.35],[0.61,0.32],[0.66,0.32],[0.70,0.35],[0.66,0.37],[0.61,0.37],
+    [0.36,0.70],[0.41,0.67],[0.46,0.66],[0.50,0.67],[0.54,0.66],[0.59,0.67],[0.64,0.70],
+    [0.59,0.74],[0.54,0.76],[0.50,0.77],[0.46,0.76],[0.41,0.74],
+    [0.41,0.70],[0.46,0.69],[0.50,0.70],[0.54,0.69],[0.59,0.70],[0.54,0.72],[0.50,0.73],[0.46,0.72]
+  ];
+  function rangeEdges(a, b, loop) {
+    const e = [];
+    for (let i = a; i < b; i++) e.push([i, i + 1]);
+    if (loop) e.push([b, a]);
+    return e;
+  }
+  const FACE_EDGES = [
+    ...rangeEdges(0, 16, false),
+    ...rangeEdges(17, 21, false),
+    ...rangeEdges(22, 26, false),
+    ...rangeEdges(27, 30, false),
+    ...rangeEdges(31, 35, false),
+    ...rangeEdges(36, 41, true),
+    ...rangeEdges(42, 47, true),
+    ...rangeEdges(48, 59, true),
+    ...rangeEdges(60, 67, true),
+    [17, 36], [21, 39], [22, 42], [26, 45],
+    [21, 27], [22, 27], [30, 39], [30, 42],
+    [33, 51], [31, 48], [35, 54], [8, 57], [48, 5], [54, 11],
+    [36, 17], [45, 26]
+  ];
+
+  let meshRaf = 0;
+  let meshDetector = null;
+  let meshBox = null;
+  let meshDetectAt = 0;
+
+  function ovalMetrics(w, h) {
+    return { cx: w * 0.5, cy: h * 0.5, rx: w * 0.35, ry: h * 0.40 };
+  }
+
+  function mapVideoToOverlay(vx, vy, video, w, h) {
+    const vw = video.videoWidth || 1;
+    const vh = video.videoHeight || 1;
+    const scale = Math.max(w / vw, h / vh);
+    const dw = vw * scale;
+    const dh = vh * scale;
+    const ox = (w - dw) / 2;
+    const oy = (h - dh) / 2;
+    return { x: w - (ox + vx * scale), y: oy + vy * scale };
+  }
+
+  async function detectFaceBox(w, h) {
+    const video = els.selfieVideo;
+    if (!video || !video.videoWidth) return null;
+    try {
+      if (!meshDetector && typeof window.FaceDetector === 'function') {
+        meshDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      }
+      if (!meshDetector) return null;
+      const faces = await meshDetector.detect(video);
+      if (!faces || !faces[0] || !faces[0].boundingBox) return null;
+      const b = faces[0].boundingBox;
+      const p1 = mapVideoToOverlay(b.x, b.y, video, w, h);
+      const p2 = mapVideoToOverlay(b.x + b.width, b.y + b.height, video, w, h);
+      const x = Math.min(p1.x, p2.x);
+      const y = Math.min(p1.y, p2.y);
+      return { x, y, w: Math.abs(p2.x - p1.x), h: Math.abs(p2.y - p1.y) };
+    } catch (_) {
+      meshDetector = null;
+      return null;
+    }
+  }
+
+  function startFaceMesh() {
+    const canvas = els.faceMesh;
+    if (!canvas) return;
+    stopFaceMesh();
+    const tick = async (t) => {
+      if (!els.selfieWrap || !els.selfieWrap.classList.contains('live')) {
+        meshRaf = 0;
+        return;
+      }
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = canvas.clientWidth || els.selfieWrap.clientWidth;
+      const h = canvas.clientHeight || els.selfieWrap.clientHeight;
+      if (w && h && (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr))) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      if (t - meshDetectAt > 280) {
+        meshDetectAt = t;
+        const next = await detectFaceBox(w, h);
+        if (next) meshBox = next;
+      }
+      drawFaceMesh(canvas, w, h, dpr, t);
+      meshRaf = requestAnimationFrame(tick);
+    };
+    meshRaf = requestAnimationFrame(tick);
+  }
+
+  function stopFaceMesh() {
+    if (meshRaf) cancelAnimationFrame(meshRaf);
+    meshRaf = 0;
+    meshBox = null;
+    const canvas = els.faceMesh;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function drawFaceMesh(canvas, w, h, dpr, t) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !w || !h) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const oval = ovalMetrics(w, h);
+    // Default mesh sits in the upper-center of the oval (ID-photo framing).
+    let bx = oval.cx - oval.rx * 0.90;
+    let by = oval.cy - oval.ry * 0.82;
+    let bw = oval.rx * 1.80;
+    let bh = oval.ry * 1.52;
+    if (meshBox && meshBox.w > 20 && meshBox.h > 20) {
+      const nx = meshBox.x + meshBox.w * 0.5;
+      const ny = meshBox.y + meshBox.h * 0.5;
+      const nrx = meshBox.w * 0.55;
+      const nry = meshBox.h * 0.65;
+      bx = nx - nrx;
+      by = ny - nry;
+      bw = nrx * 2;
+      bh = nry * 2;
+    }
+    const pts = FACE_PTS.map(([nx, ny]) => ({ x: bx + nx * bw, y: by + ny * bh }));
+    const period = 2200;
+    const scanP = (t % period) / period;
+    const scanY = oval.cy - oval.ry + scanP * oval.ry * 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(oval.cx, oval.cy, oval.rx, oval.ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.lineWidth = 0.7;
+    FACE_EDGES.forEach(([a, b]) => {
+      const pa = pts[a], pb = pts[b];
+      if (!pa || !pb) return;
+      const midY = (pa.y + pb.y) / 2;
+      const near = 1 - Math.min(1, Math.abs(midY - scanY) / 28);
+      ctx.strokeStyle = near > 0.35
+        ? `rgba(245,184,46,${0.18 + near * 0.55})`
+        : 'rgba(127,227,236,0.28)';
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+    });
+
+    pts.forEach((p, i) => {
+      const phase = (t / 420 + i * 0.17) % (Math.PI * 2);
+      const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(phase));
+      const near = 1 - Math.min(1, Math.abs(p.y - scanY) / 22);
+      const gold = near > 0.4;
+      const r = gold ? 1.7 : 1.25;
+      ctx.beginPath();
+      ctx.fillStyle = gold
+        ? `rgba(245,184,46,${0.55 + pulse * 0.45})`
+        : `rgba(159,240,245,${0.35 + pulse * 0.55})`;
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (gold || pulse > 0.85) {
+        ctx.beginPath();
+        ctx.fillStyle = gold ? 'rgba(245,184,46,0.22)' : 'rgba(47,198,211,0.2)';
+        ctx.arc(p.x, p.y, r + 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+
+    const grad = ctx.createLinearGradient(oval.cx, scanY - 10, oval.cx, scanY + 10);
+    grad.addColorStop(0, 'rgba(47,198,211,0)');
+    grad.addColorStop(0.45, 'rgba(159,240,245,0.55)');
+    grad.addColorStop(0.5, 'rgba(245,184,46,0.85)');
+    grad.addColorStop(0.55, 'rgba(159,240,245,0.55)');
+    grad.addColorStop(1, 'rgba(47,198,211,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(oval.cx - oval.rx, scanY - 10, oval.rx * 2, 20);
+    ctx.strokeStyle = 'rgba(245,184,46,0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(oval.cx - oval.rx + 6, scanY);
+    ctx.lineTo(oval.cx + oval.rx - 6, scanY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function flashAuthenticating(ms) {
+    return new Promise((resolve) => {
+      if (els.faceAuth) els.faceAuth.hidden = false;
+      setTimeout(() => {
+        if (els.faceAuth) els.faceAuth.hidden = true;
+        resolve();
+      }, ms || 900);
+    });
+  }
+
   async function startSelfieCam() {
     setFaceMode('live');
     if (els.selfiePreview) els.selfiePreview.hidden = true;
@@ -690,6 +902,7 @@
         els.selfieWrap.classList.add('live');
         els.selfieWrap.classList.remove('is-placeholder', 'preview');
       }
+      startFaceMesh();
       if (snap) snap.disabled = false;
     } catch (e) {
       if (els.selfieWrap) els.selfieWrap.classList.add('is-placeholder');
@@ -722,6 +935,9 @@
     state.selfie = await compressFile(new File([blob], 'selfie.jpg', { type: 'image/jpeg' }), 1200, 0.85);
     state.skipFace = false;
     state.selfieAccepted = false;
+    const snap = $('#btnSelfieSnap');
+    if (snap) snap.disabled = true;
+    await flashAuthenticating(900);
     showFacePreview();
   }
 
@@ -733,6 +949,7 @@
     state.faceConsent = state.faceConsent || true;
     if (!state.faceConsentAt) state.faceConsentAt = new Date().toISOString();
     closeConsent();
+    await flashAuthenticating(700);
     showFacePreview();
   }
 
@@ -754,6 +971,8 @@
   }
 
   function stopSelfie() {
+    stopFaceMesh();
+    if (els.faceAuth) els.faceAuth.hidden = true;
     if (state.selfieStream) {
       state.selfieStream.getTracks().forEach((t) => t.stop());
       state.selfieStream = null;
@@ -870,14 +1089,16 @@
     else showStep(state.step - 1);
   });
 
-  $('#btnFrontCam').addEventListener('click', () => $('#inputFrontCam').click());
-  $('#btnFrontLib').addEventListener('click', () => $('#inputFrontLib').click());
-  $('#btnBackCam').addEventListener('click', () => $('#inputBackCam').click());
-  $('#btnBackLib').addEventListener('click', () => $('#inputBackLib').click());
-  $('#inputFrontCam').addEventListener('change', () => handleCccdImage($('#inputFrontCam').files[0], 'front'));
-  $('#inputFrontLib').addEventListener('change', () => handleCccdImage($('#inputFrontLib').files[0], 'front'));
-  $('#inputBackCam').addEventListener('change', () => handleCccdImage($('#inputBackCam').files[0], 'back'));
-  $('#inputBackLib').addEventListener('change', () => handleCccdImage($('#inputBackLib').files[0], 'back'));
+  ['front', 'back'].forEach((w) => {
+    const W = w === 'front' ? 'Front' : 'Back';
+    const box = $('#box' + W);
+    const input = $('#input' + W);
+    const open = () => { input.value = ''; input.click(); };
+    box.addEventListener('click', open);
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    $('#btn' + W + 'Retake').addEventListener('click', (e) => { e.stopPropagation(); open(); });
+    input.addEventListener('change', () => handleCccdImage(input.files[0], w));
+  });
 
   $('#btnScanQrLive').addEventListener('click', startScanLive);
   $('#btnStopScan').addEventListener('click', stopScanLive);

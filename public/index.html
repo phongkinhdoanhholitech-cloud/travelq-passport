@@ -92,41 +92,41 @@
     <!-- STEP 1: CCCD -->
     <section class="step" id="step1" data-step="1">
       <h2>Chụp Căn cước 2 mặt</h2>
-      <p class="step-desc">Chụp hoặc chọn ảnh CCCD. Hệ thống sẽ quét QR trên mặt trước để điền thông tin.</p>
+      <p class="step-desc">Chạm vào từng ô để chụp hoặc chọn ảnh. QR mặt trước sẽ được quét tự động.</p>
       <div class="thumb-row">
-        <div class="thumb-box" id="boxFront">
-          <div class="thumb-ph">CCCD mặt trước</div>
-          <img id="previewFront" alt="CCCD trước" />
+        <div class="thumb-box" id="boxFront" role="button" tabindex="0" aria-label="Thêm ảnh CCCD mặt trước">
+          <div class="thumb-ph">
+            <span class="thumb-plus" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+            <span class="thumb-label">CCCD mặt trước</span>
+            <span class="thumb-sub">Chạm để chụp / chọn ảnh</span>
+          </div>
+          <img id="previewFront" alt="CCCD mặt trước" />
+          <button type="button" class="thumb-retake" id="btnFrontRetake" aria-label="Chụp lại CCCD mặt trước">↻ Chụp lại</button>
         </div>
-        <div class="thumb-box" id="boxBack">
-          <div class="thumb-ph">CCCD mặt sau</div>
-          <img id="previewBack" alt="CCCD sau" />
+        <div class="thumb-box" id="boxBack" role="button" tabindex="0" aria-label="Thêm ảnh CCCD mặt sau">
+          <div class="thumb-ph">
+            <span class="thumb-plus" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+            <span class="thumb-label">CCCD mặt sau</span>
+            <span class="thumb-sub">Chạm để chụp / chọn ảnh</span>
+          </div>
+          <img id="previewBack" alt="CCCD mặt sau" />
+          <button type="button" class="thumb-retake" id="btnBackRetake" aria-label="Chụp lại CCCD mặt sau">↻ Chụp lại</button>
         </div>
       </div>
-      <div class="actions tight">
-        <button type="button" class="btn btn-teal" id="btnFrontCam">📷 Chụp trước</button>
-        <button type="button" class="btn btn-ghost" id="btnFrontLib">🖼️ Thư viện trước</button>
-        <button type="button" class="btn btn-teal" id="btnBackCam">📷 Chụp sau</button>
-        <button type="button" class="btn btn-ghost" id="btnBackLib">🖼️ Thư viện sau</button>
-      </div>
-      <input type="file" id="inputFrontCam" accept="image/*" capture="environment" hidden />
-      <input type="file" id="inputFrontLib" accept="image/*" hidden />
-      <input type="file" id="inputBackCam" accept="image/*" capture="environment" hidden />
-      <input type="file" id="inputBackLib" accept="image/*" hidden />
+      <input type="file" id="inputFront" accept="image/*" hidden />
+      <input type="file" id="inputBack" accept="image/*" hidden />
 
       <div class="scan-live" id="scanLiveWrap" hidden>
         <video id="scanVideo" playsinline muted></video>
         <canvas id="scanCanvas" hidden></canvas>
         <div class="scan-hint">Đưa QR trên CCCD vào khung</div>
       </div>
-      <div class="actions tight">
-        <button type="button" class="btn btn-gold" id="btnScanQrLive">▣ Quét QR trên CCCD</button>
-        <button type="button" class="btn btn-ghost" id="btnStopScan" hidden>Dừng quét</button>
-      </div>
-      <div class="hint" id="hintQr">QR CCCD nằm góc trên phải mặt trước (chip). Nếu không đọc được vẫn có thể tiếp tục.</div>
-      <div class="actions">
-        <button type="button" class="btn btn-teal" id="btnStep1Next">Tiếp tục →</button>
-        <button type="button" class="btn btn-ghost" id="btnSkipCccd">Bỏ qua</button>
+      <button type="button" class="btn btn-ghost btn-block btn-scan" id="btnScanQrLive">▣ Quét QR trên CCCD</button>
+      <button type="button" class="btn btn-ghost btn-block" id="btnStopScan" hidden>Dừng quét</button>
+      <div class="hint" id="hintQr">QR nằm góc trên phải mặt trước.</div>
+      <div class="step1-footer">
+        <button type="button" class="btn btn-teal btn-block btn-lg" id="btnStep1Next">Tiếp tục →</button>
+        <button type="button" class="btn-text" id="btnSkipCccd">Bỏ qua</button>
       </div>
     </section>
 
@@ -201,7 +201,11 @@
           <canvas id="selfieCanvas" hidden></canvas>
           <img id="selfiePreview" alt="Ảnh khuôn mặt" hidden />
           <div class="selfie-mask" aria-hidden="true"></div>
+          <canvas class="face-mesh" id="faceMesh" aria-hidden="true"></canvas>
           <div class="selfie-oval-ring" aria-hidden="true"></div>
+          <div class="face-auth" id="faceAuth" hidden>
+            <span>Đang xác thực...</span>
+          </div>
         </div>
         <p class="face-guide" id="faceGuide">Đưa khuôn mặt vào khung oval, nhìn thẳng, đủ sáng</p>
       </div>
