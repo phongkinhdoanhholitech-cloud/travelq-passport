@@ -24,6 +24,8 @@
     skipCccd: false,
     skipFace: false,
     source: 'manual',
+    issueDate: '',
+    passportNo: '',
     scanStream: null,
     selfieStream: null,
     scanTimer: null
@@ -97,8 +99,19 @@
 
   function formatDateVi(iso) {
     if (!iso) return '—';
-    const [y, m, d] = iso.split('-');
-    return d ? `${d}/${m}/${y}` : iso;
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso);
+  }
+
+  const DOC_HINT = 'Nhập CCCD (12 chữ số) hoặc hộ chiếu (1 chữ cái + 7 chữ số, ví dụ C1234567)';
+  const DOC_INVALID = 'Số không hợp lệ. CCCD phải đúng 12 chữ số; hộ chiếu phải là 1 chữ cái và 7 chữ số (ví dụ C1234567).';
+
+  function parseDocNo(raw) {
+    const v = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!v) return { ok: false, empty: true, value: '', cccd: '', passportNo: '', error: DOC_HINT };
+    if (/^\d{12}$/.test(v)) return { ok: true, empty: false, value: v, kind: 'cccd', cccd: v, passportNo: '', error: '' };
+    if (/^[A-Z]\d{7}$/.test(v)) return { ok: true, empty: false, value: v, kind: 'passport', cccd: '', passportNo: v, error: '' };
+    return { ok: false, empty: false, value: v, cccd: '', passportNo: '', error: DOC_INVALID };
   }
 
   function ddmmyyyyToIso(s) {
@@ -178,10 +191,10 @@
     const name = ($('#inputName').value || state.accountName || '').trim();
     els.viewName.textContent = (name || '—').toUpperCase();
     const country = ($('#inputCountry').value || 'Việt Nam').trim();
-    const issue = $('#inputCccdIssue').value || '';
-    els.viewMeta.textContent = `${country || '—'} · Cấp ngày ${formatDateVi(issue)}`;
-    const pass = ($('#inputPassport').value || '').trim() || '—';
-    els.viewPassport.textContent = 'Hộ chiếu: ' + pass;
+    els.viewMeta.textContent = `${country || '—'} · Cấp ngày ${formatDateVi(state.issueDate)}`;
+    const doc = parseDocNo($('#inputDocNo') && $('#inputDocNo').value);
+    const pass = state.passportNo || doc.passportNo || '';
+    els.viewPassport.textContent = 'Hộ chiếu: ' + (pass || '—');
     if (state.photo) {
       els.viewPhoto.src = state.photo;
       els.idcard.classList.add('has-photo');
@@ -356,12 +369,10 @@
     if (!/^\d{9,12}$/.test(soCccd)) return null;
     return {
       cccd: soCccd,
-      oldCmnd: soCmnd || '',
       name: (hoTen || '').trim(),
       dob: ddmmyyyyToIso(ngaySinh),
       gender: (gioiTinh || '').trim(),
       address: (diaChi || '').trim(),
-      cccdIssueDate: ddmmyyyyToIso(ngayCap),
       province: matchProvince(diaChi),
       country: 'Việt Nam',
       raw
@@ -371,13 +382,11 @@
   function applyCccdQr(parsed) {
     if (!parsed) return;
     state.source = 'cccd_qr';
-    if (parsed.cccd) $('#inputCccd').value = parsed.cccd;
-    if (parsed.oldCmnd) $('#inputOldCmnd').value = parsed.oldCmnd;
+    if (parsed.cccd && $('#inputDocNo')) $('#inputDocNo').value = parsed.cccd;
     if (parsed.name) $('#inputName').value = parsed.name;
     if (parsed.dob) $('#inputDob').value = parsed.dob;
     if (parsed.gender) $('#inputGender').value = parsed.gender;
     if (parsed.address) $('#inputAddress').value = parsed.address;
-    if (parsed.cccdIssueDate) $('#inputCccdIssue').value = parsed.cccdIssueDate;
     $('#inputCountry').value = 'Việt Nam';
     updateCountryMode();
     if (parsed.province) els.province.value = parsed.province;
@@ -502,25 +511,14 @@
   }
 
   function updateDocHint() {
-    const cccd = ($('#inputCccd').value || '').replace(/\D/g, '');
-    const pass = ($('#inputPassport').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const doc = parseDocNo($('#inputDocNo') && $('#inputDocNo').value);
     els.hintCccd.classList.remove('ok', 'warn');
-    if (!cccd && !pass) {
-      els.hintCccd.textContent = 'Nhập ít nhất CCCD hoặc số hộ chiếu';
+    if (!doc.ok) {
+      els.hintCccd.textContent = doc.error;
       els.hintCccd.classList.add('warn');
       return false;
     }
-    if (cccd && !/^\d{12}$/.test(cccd)) {
-      els.hintCccd.textContent = 'CCCD phải đủ 12 chữ số (hiện ' + cccd.length + ')';
-      els.hintCccd.classList.add('warn');
-      return false;
-    }
-    if (pass && !/^[A-Z0-9]{6,9}$/.test(pass)) {
-      els.hintCccd.textContent = 'Hộ chiếu: 6–9 ký tự chữ/số';
-      els.hintCccd.classList.add('warn');
-      return false;
-    }
-    els.hintCccd.textContent = cccd && pass ? 'CCCD + hộ chiếu ✓' : (cccd ? 'CCCD ✓' : 'Hộ chiếu ✓');
+    els.hintCccd.textContent = doc.kind === 'cccd' ? 'CCCD ✓' : 'Hộ chiếu ✓';
     els.hintCccd.classList.add('ok');
     return true;
   }
@@ -538,7 +536,7 @@
     if (!country) return 'Thiếu quốc gia';
     if (isVN && !province) return 'Chọn tỉnh/thành phố';
     if (!isVN && !province) return 'Nhập tỉnh/thành (nước ngoài)';
-    if (!updateDocHint()) return 'Nhập ít nhất CCCD hoặc số hộ chiếu';
+    if (!updateDocHint()) return parseDocNo($('#inputDocNo') && $('#inputDocNo').value).error || DOC_HINT;
     return null;
   }
 
@@ -593,18 +591,16 @@
         body: JSON.stringify({
           id: state.accountId,
           name: ($('#inputName').value || '').trim(),
-          cccd: ($('#inputCccd').value || '').replace(/\D/g, ''),
-          passportNo: ($('#inputPassport').value || '').trim().toUpperCase(),
+          docNo: ($('#inputDocNo').value || '').trim(),
+          cccd: parseDocNo($('#inputDocNo').value).cccd,
+          passportNo: parseDocNo($('#inputDocNo').value).passportNo,
           dob: $('#inputDob').value || '',
           address: ($('#inputAddress').value || '').trim(),
           phone: ($('#inputPhone').value || '').trim(),
           gender: $('#inputGender').value || '',
           country: ($('#inputCountry').value || '').trim(),
           province,
-          oldCmnd: ($('#inputOldCmnd').value || '').trim(),
-          cccdIssueDate: $('#inputCccdIssue').value || '',
           nationality: ($('#inputCountry').value || '').trim(),
-          issueDate: $('#inputCccdIssue').value || '',
           cccdFrontDataUrl: state.skipCccd ? null : state.cccdFront,
           cccdBackDataUrl: state.skipCccd ? null : state.cccdBack,
           selfieDataUrl: state.skipFace ? null : state.selfie,
@@ -616,6 +612,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.hint || 'SAVE_FAILED');
       state.qrPayload = data.qrPayload || state.qrPayload;
+      state.issueDate = data.issueDate || (data.savedAt || '').slice(0, 10);
+      state.passportNo = parseDocNo($('#inputDocNo').value).passportNo;
       state.saved = true;
       els.statusPill.textContent = 'ĐÃ LƯU';
       els.statusPill.className = 'pill ok';
@@ -692,15 +690,13 @@
 
   $('#inputCountry').addEventListener('input', updateCountryMode);
   $('#inputCountry').addEventListener('change', updateCountryMode);
-  $('#inputCccd').addEventListener('input', () => {
-    $('#inputCccd').value = $('#inputCccd').value.replace(/\D/g, '').slice(0, 12);
+  $('#inputDocNo').addEventListener('input', () => {
+    const el = $('#inputDocNo');
+    el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
     updateDocHint();
+    updateCard();
   });
-  $('#inputPassport').addEventListener('input', () => {
-    $('#inputPassport').value = $('#inputPassport').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
-    updateDocHint();
-  });
-  ['inputName', 'inputDob', 'inputPassport', 'inputCccdIssue'].forEach((id) => {
+  ['inputName', 'inputDob', 'inputCountry'].forEach((id) => {
     $('#' + id).addEventListener('input', updateCard);
     $('#' + id).addEventListener('change', updateCard);
   });

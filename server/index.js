@@ -49,6 +49,25 @@ function clipDataUrl(v, max = 4_000_000) {
   return s.slice(0, max);
 }
 
+const DOC_HINT = 'Nhập CCCD (12 chữ số) hoặc hộ chiếu (1 chữ cái + 7 chữ số, ví dụ C1234567)';
+const DOC_INVALID = 'Số không hợp lệ. CCCD phải đúng 12 chữ số; hộ chiếu phải là 1 chữ cái và 7 chữ số (ví dụ C1234567).';
+
+function parseDocNo(raw) {
+  const v = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!v) return { ok: false, empty: true, cccd: '', passportNo: '', error: DOC_HINT };
+  if (/^\d{12}$/.test(v)) return { ok: true, empty: false, kind: 'cccd', cccd: v, passportNo: '' };
+  if (/^[A-Z]\d{7}$/.test(v)) return { ok: true, empty: false, kind: 'passport', cccd: '', passportNo: v };
+  return { ok: false, empty: false, cccd: '', passportNo: '', error: DOC_INVALID };
+}
+
+function todayISO(timeZone = 'Asia/Saigon') {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 async function main() {
   await db.init();
   const app = express();
@@ -77,20 +96,44 @@ async function main() {
         return res.status(400).json({ error: 'INVALID_ID_FORMAT', hint: '4–20 chars A-Z/0-9' });
       }
       const name = String(body.name || '').trim();
-      const cccd = String(body.cccd || '').replace(/\D/g, '').slice(0, 12);
       const dob = String(body.dob || '').trim();
       const address = String(body.address || '').trim();
       const phone = String(body.phone || '').trim();
       const gender = String(body.gender || '').trim();
       const country = String(body.country || body.nationality || '').trim();
       const province = String(body.province || '').trim();
-      const oldCmnd = String(body.oldCmnd || '').replace(/\D/g, '').slice(0, 12);
-      const cccdIssueDate = String(body.cccdIssueDate || body.issueDate || '').trim();
       const cccdFront = clipDataUrl(body.cccdFrontDataUrl);
       const cccdBack = clipDataUrl(body.cccdBackDataUrl);
       const selfie = clipDataUrl(body.selfieDataUrl, 2_000_000);
-      const passportNo = String(body.passportNo || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
       const source = ['cccd_qr', 'manual'].includes(body.source) ? body.source : 'manual';
+
+      // Prefer the unified doc field; still accept legacy cccd / passportNo
+      let cccd = '';
+      let passportNo = '';
+      if (body.docNo != null && String(body.docNo).trim() !== '') {
+        const doc = parseDocNo(body.docNo);
+        if (!doc.ok) {
+          return res.status(400).json({ error: 'DOC_INVALID', hint: doc.error });
+        }
+        cccd = doc.cccd;
+        passportNo = doc.passportNo;
+      } else {
+        const fromCccd = parseDocNo(body.cccd);
+        const fromPass = parseDocNo(body.passportNo);
+        if (body.cccd != null && String(body.cccd).trim() !== '' && !fromCccd.ok) {
+          return res.status(400).json({ error: 'DOC_INVALID', hint: DOC_INVALID });
+        }
+        if (body.passportNo != null && String(body.passportNo).trim() !== '' && !fromPass.ok) {
+          return res.status(400).json({ error: 'DOC_INVALID', hint: DOC_INVALID });
+        }
+        cccd = fromCccd.ok ? fromCccd.cccd : '';
+        passportNo = fromPass.ok ? fromPass.passportNo : '';
+        // A single legacy value might have been sent in the "wrong" slot
+        if (!cccd && !passportNo) {
+          const either = parseDocNo(body.cccd || body.passportNo);
+          if (either.ok) { cccd = either.cccd; passportNo = either.passportNo; }
+        }
+      }
 
       // Drop ID confirm — ID comes from host app; still accept idConfirm if sent for back-compat
       if (body.idConfirm != null && String(body.idConfirm).length) {
@@ -100,14 +143,8 @@ async function main() {
         }
       }
 
-      if (cccd) {
-        if (!/^\d{12}$/.test(cccd)) return res.status(400).json({ error: 'CCCD_INVALID' });
-      }
-      if (passportNo && !/^[A-Z0-9]{6,9}$/.test(passportNo)) {
-        return res.status(400).json({ error: 'PASSPORT_INVALID' });
-      }
       if (!cccd && !passportNo) {
-        return res.status(400).json({ error: 'CCCD_OR_PASSPORT_REQUIRED', hint: 'Nhập ít nhất CCCD hoặc số hộ chiếu' });
+        return res.status(400).json({ error: 'DOC_REQUIRED', hint: DOC_HINT });
       }
       if (!name) return res.status(400).json({ error: 'NAME_REQUIRED' });
       if (!dob) return res.status(400).json({ error: 'DOB_REQUIRED' });
@@ -127,6 +164,8 @@ async function main() {
         else kyc = 'skipped';
       }
 
+      const savedAt = new Date().toISOString();
+      const issueDate = todayISO('Asia/Saigon');
       const record = {
         id,
         name,
@@ -137,18 +176,16 @@ async function main() {
         gender,
         country,
         province,
-        oldCmnd,
-        cccdIssueDate,
         passportNo,
         nationality: country,
-        issueDate: cccdIssueDate,
+        issueDate,
         cccdFrontDataUrl: cccdFront,
         cccdBackDataUrl: cccdBack,
         selfieDataUrl: selfie,
         photoDataUrl: clipDataUrl(body.photoDataUrl, 1_500_000),
         kyc,
         source,
-        savedAt: new Date().toISOString()
+        savedAt
       };
 
       const packed = encryptJson(DATA_KEY, record);
@@ -168,7 +205,8 @@ async function main() {
         displayId: displayId(id),
         qrPayload,
         updated: isUpdate,
-        savedAt: record.savedAt
+        savedAt: record.savedAt,
+        issueDate: record.issueDate
       });
     } catch (e) {
       console.error(e);
@@ -192,7 +230,8 @@ async function main() {
         name: record.name,
         passportNo: record.passportNo || '',
         nationality: record.nationality || '',
-        issueDate: record.issueDate || '',
+        issueDate: record.issueDate || record.savedAt || row.updated_at || '',
+        savedAt: record.savedAt || row.updated_at || '',
         dob: record.dob || '',
         address: record.address || '',
         phone: record.phone || '',
@@ -200,8 +239,6 @@ async function main() {
         gender: record.gender || '',
         country: record.country || record.nationality || '',
         province: record.province || '',
-        oldCmnd: record.oldCmnd || '',
-        cccdIssueDate: record.cccdIssueDate || record.issueDate || '',
         cccd: record.cccd || '',
         cccdMasked: maskCccd(record.cccd),
         cccdFrontDataUrl: record.cccdFrontDataUrl || null,

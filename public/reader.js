@@ -16,9 +16,10 @@
 
   function formatDateVi(iso) {
     if (!iso) return '—';
-    const [y, m, d] = String(iso).split('-');
-    if (!d) return iso;
-    return `${d}/${m}/${y}`;
+    const s = String(iso);
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return s;
+    return `${m[3]}/${m[2]}/${m[1]}`;
   }
 
   function mask(cccd) {
@@ -55,14 +56,13 @@
       if ($('#lrGender')) $('#lrGender').textContent = data.gender || '—';
       $('#lrPassport').textContent = data.passportNo || '—';
       $('#lrNationality').textContent = data.nationality || data.country || '—';
-      $('#lrDate').textContent = formatDateVi(data.cccdIssueDate || data.issueDate);
+      $('#lrDate').textContent = formatDateVi(data.issueDate || data.savedAt || data.updatedAt);
       $('#lrAddress').textContent = data.address || '—';
       if ($('#lrCountry')) $('#lrCountry').textContent = data.country || data.nationality || '—';
       if ($('#lrProvince')) $('#lrProvince').textContent = data.province || '—';
       $('#lrPhone').textContent = data.phoneMasked || data.phone || '—';
       $('#lrKyc').textContent = data.kyc || 'skipped';
       if ($('#lrSource')) $('#lrSource').textContent = data.source || 'manual';
-      if ($('#lrOldCmnd')) $('#lrOldCmnd').textContent = data.oldCmnd || '—';
       $('#lrSig').textContent = data.signatureVerified ? 'Hợp lệ ✓' : 'Không có / chưa kiểm';
       $('#lrCccd').textContent = data.cccdMasked || mask(fullCccd);
       $('#btnReveal').textContent = 'Hiện';

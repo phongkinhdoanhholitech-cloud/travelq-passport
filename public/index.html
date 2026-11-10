@@ -180,21 +180,9 @@
         <input id="inputProvinceText" type="text" placeholder="Tỉnh/thành" hidden />
       </div>
       <div class="form-group">
-        <label for="inputCccd">Số CCCD <em>(hoặc hộ chiếu)</em> <span class="req">*</span></label>
-        <input id="inputCccd" type="text" inputmode="numeric" maxlength="12" placeholder="079123456789" />
-        <div class="hint" id="hintCccd">Nhập ít nhất CCCD hoặc số hộ chiếu</div>
-      </div>
-      <div class="form-group">
-        <label for="inputPassport">Số hộ chiếu <em>(hoặc CCCD)</em> <span class="req">*</span></label>
-        <input id="inputPassport" type="text" maxlength="9" placeholder="C1234567" style="text-transform:uppercase" />
-      </div>
-      <div class="form-group">
-        <label for="inputOldCmnd">Số CMND cũ</label>
-        <input id="inputOldCmnd" type="text" maxlength="12" placeholder="(từ QR CCCD nếu có)" />
-      </div>
-      <div class="form-group">
-        <label for="inputCccdIssue">Ngày cấp CCCD</label>
-        <input id="inputCccdIssue" type="date" />
+        <label for="inputDocNo">Số CCCD hoặc Hộ chiếu <span class="req">*</span></label>
+        <input id="inputDocNo" type="text" maxlength="12" placeholder="079123456789 hoặc C1234567" autocomplete="off" spellcheck="false" />
+        <div class="hint" id="hintCccd">Nhập CCCD (12 chữ số) hoặc hộ chiếu (1 chữ cái + 7 chữ số, ví dụ C1234567)</div>
       </div>
       <div class="form-group">
         <label for="inputPhone">Số điện thoại</label>
