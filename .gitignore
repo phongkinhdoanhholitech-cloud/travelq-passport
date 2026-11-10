@@ -1,0 +1,17 @@
+node_modules/
+server/node_modules/
+server/.env
+server/data/*
+!server/data/.gitkeep
+server/bin/
+bin/
+*.pid
+*.log
+server/current-url.txt
+server/public-url.txt
+server/last-id.txt
+server/PUBLIC.txt
+preview*.png
+*.zip
+ref/
+.DS_Store

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: travelq-passport
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRAVELQ_DATA_KEY
+        generateValue: true
+      - key: TRAVELQ_HMAC_SECRET
+        generateValue: true
+      - key: TRAVELQ_API_KEY
+        sync: false

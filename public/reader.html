@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#04262f" />
+  <title>TravelQ Reader — Tra cứu ID</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <img class="logo" src="/assets/logo-white.webp" alt="TravelQ" />
+      <div class="ttl">TravelQ Reader<small>Giải mã QR / ID</small></div>
+    </header>
+
+    <h1 class="h1">TRA CỨU HỒ SƠ</h1>
+    <p class="center" style="opacity:.8;font-size:.9rem;margin:0 0 14px">
+      Quét QR, tải ảnh QR, hoặc nhập ID tài khoản — không cần PIN.
+    </p>
+
+    <aside class="panel">
+      <div class="form-group">
+        <label for="lookupId">Account ID hoặc payload QR</label>
+        <input id="lookupId" type="text" placeholder="017715 hoặc 017715.xxxx" autocomplete="off" />
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-gold" id="btnLookup">🔍 Tra cứu</button>
+        <button type="button" class="btn btn-teal" id="btnCam">📷 Bật camera quét QR</button>
+        <button type="button" class="btn btn-ghost" id="btnScanFile">🖼️ Quét từ ảnh</button>
+        <input type="file" id="scanFile" accept="image/*" hidden />
+      </div>
+      <video id="readerVideo" playsinline muted></video>
+      <canvas id="readerCanvas" style="display:none"></canvas>
+      <div class="status" id="lookupStatus"></div>
+
+      <div class="lookup-result" id="lookupResult">
+        <div class="row"><span class="k">ID</span><span class="v" id="lrId">—</span></div>
+        <div class="row"><span class="k">Họ và tên</span><span class="v" id="lrName">—</span></div>
+        <div class="row"><span class="k">Ngày sinh</span><span class="v" id="lrDob">—</span></div>
+        <div class="row"><span class="k">Giới tính</span><span class="v" id="lrGender">—</span></div>
+        <div class="row"><span class="k">Số hộ chiếu</span><span class="v" id="lrPassport">—</span></div>
+        <div class="row"><span class="k">Quốc tịch</span><span class="v" id="lrNationality">—</span></div>
+        <div class="row"><span class="k">Ngày cấp</span><span class="v" id="lrDate">—</span></div>
+        <div class="row"><span class="k">Địa chỉ</span><span class="v" id="lrAddress">—</span></div>
+        <div class="row"><span class="k">Quốc gia</span><span class="v" id="lrCountry">—</span></div>
+        <div class="row"><span class="k">Tỉnh/TP</span><span class="v" id="lrProvince">—</span></div>
+        <div class="row"><span class="k">SĐT</span><span class="v" id="lrPhone">—</span></div>
+        <div class="row"><span class="k">KYC</span><span class="v" id="lrKyc">—</span></div>
+        <div class="row"><span class="k">Nguồn</span><span class="v" id="lrSource">—</span></div>
+        <div class="row"><span class="k">CMND cũ</span><span class="v" id="lrOldCmnd">—</span></div>
+        <div class="row"><span class="k">Chữ ký QR</span><span class="v" id="lrSig">—</span></div>
+        <div class="row">
+          <span class="k">Số CCCD</span>
+          <span class="v" style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
+            <span id="lrCccd">—</span>
+            <button type="button" class="btn-tiny" id="btnReveal">Hiện</button>
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="nav-links">
+      <a href="/">← Về trang hồ sơ</a>
+    </div>
+    <footer class="footer">Reader demo · production nên bật X-API-Key</footer>
+  </div>
+
+  <script src="/vendor/jsQR.js"></script>
+  <script src="/reader.js"></script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#04262f" />
+  <title>TravelQ Passport — Hồ sơ ID du lịch</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" href="/assets/logo-white.png" />
+</head>
+<body>
+  <div class="page" id="mainPage">
+    <header class="topbar">
+      <img class="logo" src="/assets/logo-white.webp" alt="TravelQ" width="94" height="34" />
+      <div class="ttl">TravelQ ID<small>Mã định danh du lịch toàn cầu</small></div>
+    </header>
+
+    <div class="hero-mascot">
+      <img src="/assets/mascot.webp" alt="TravelQ mascot" width="120" height="120" />
+    </div>
+
+    <h1 class="h1">HỒ SƠ ID DU LỊCH</h1>
+    <div class="center">
+      <span class="pill idle" id="statusPill">CHƯA LƯU</span>
+    </div>
+    <div class="account-banner" id="accountBanner">Đang lấy ID tài khoản…</div>
+
+    <div class="card-stage">
+      <div class="card-wrap">
+        <div class="idcard" id="idcard" aria-label="Thẻ TravelQ ID">
+          <img class="lg" src="/assets/logo-white.webp" alt="travelQ" width="72" height="26" />
+          <span class="status-badge" id="cardBadge">DRAFT</span>
+          <div class="lb">Mã định danh du lịch toàn cầu</div>
+          <div class="no" id="viewId">TQ ··· ···</div>
+          <div class="who">
+            <div class="emv" aria-hidden="true">
+              <span class="ch"></span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M8 8c2.5-2.2 5.5-2.2 8 0" stroke-linecap="round"/>
+                <path d="M6 5.5c3.8-3.4 8.2-3.4 12 0" stroke-linecap="round"/>
+                <path d="M10 10.5c1.5-1.2 2.5-1.2 4 0" stroke-linecap="round"/>
+                <circle cx="12" cy="13.5" r="1.2" fill="currentColor" stroke="none"/>
+              </svg>
+            </div>
+            <div class="nm" id="viewName">—</div>
+            <div class="meta" id="viewMeta">Việt Nam · Cấp ngày —</div>
+            <div class="submeta" id="viewPassport">Hộ chiếu: —</div>
+          </div>
+          <div class="qr" id="qrHost" title="QR = account ID + HMAC"></div>
+          <div class="photo"><img id="viewPhoto" alt="" /></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn btn-gold btn-lg" id="btnUpdate">✏️ Cập nhật thông tin</button>
+      <button type="button" class="btn btn-teal" id="btnPng">⬇️ Tải thẻ PNG (300 dpi)</button>
+      <button type="button" class="btn btn-ghost" id="btnCopy">📋 Sao chép ID</button>
+    </div>
+    <div class="status" id="saveStatus"></div>
+
+    <div class="form-group" id="accountIdGroup" style="margin-top:14px">
+      <label for="inputAccountId">ID tài khoản (demo)</label>
+      <input id="inputAccountId" type="text" maxlength="20" placeholder="017715" autocomplete="off" />
+      <div class="hint">Chỉ hiện khi chưa nhúng từ app (?id=… / TravelQ.setAccount)</div>
+    </div>
+
+    <div class="note">
+      ID lấy từ <strong>tài khoản ứng dụng</strong>. QR = <code>ID.&lt;HMAC&gt;</code>.
+      Nhấn <strong>Cập nhật thông tin</strong> để chụp CCCD / điền hồ sơ / nhận diện khuôn mặt.
+    </div>
+
+    <div class="nav-links">
+      <a href="/reader.html">Mở Reader (quét QR / tra cứu)</a>
+    </div>
+    <footer class="footer">© TravelQ · Account-linked ID · AES-GCM server</footer>
+  </div>
+
+  <!-- ===== FULL-SCREEN STEPPER ===== -->
+  <div class="stepper" id="stepper" hidden>
+    <div class="stepper-bar">
+      <button type="button" class="btn-icon" id="btnStepBack" aria-label="Quay lại">←</button>
+      <div class="stepper-title" id="stepTitle">Cập nhật thông tin</div>
+      <button type="button" class="btn-icon" id="btnStepClose" aria-label="Đóng">✕</button>
+    </div>
+    <div class="progress" id="stepProgress" aria-hidden="true">
+      <div class="progress-seg on" data-step="1"></div>
+      <div class="progress-seg" data-step="2"></div>
+      <div class="progress-seg" data-step="3"></div>
+    </div>
+
+    <!-- STEP 1: CCCD -->
+    <section class="step" id="step1" data-step="1">
+      <h2>Chụp Căn cước 2 mặt</h2>
+      <p class="step-desc">Chụp hoặc chọn ảnh CCCD. Hệ thống sẽ quét QR trên mặt trước để điền thông tin.</p>
+      <div class="thumb-row">
+        <div class="thumb-box" id="boxFront">
+          <div class="thumb-ph">CCCD mặt trước</div>
+          <img id="previewFront" alt="CCCD trước" />
+        </div>
+        <div class="thumb-box" id="boxBack">
+          <div class="thumb-ph">CCCD mặt sau</div>
+          <img id="previewBack" alt="CCCD sau" />
+        </div>
+      </div>
+      <div class="actions tight">
+        <button type="button" class="btn btn-teal" id="btnFrontCam">📷 Chụp trước</button>
+        <button type="button" class="btn btn-ghost" id="btnFrontLib">🖼️ Thư viện trước</button>
+        <button type="button" class="btn btn-teal" id="btnBackCam">📷 Chụp sau</button>
+        <button type="button" class="btn btn-ghost" id="btnBackLib">🖼️ Thư viện sau</button>
+      </div>
+      <input type="file" id="inputFrontCam" accept="image/*" capture="environment" hidden />
+      <input type="file" id="inputFrontLib" accept="image/*" hidden />
+      <input type="file" id="inputBackCam" accept="image/*" capture="environment" hidden />
+      <input type="file" id="inputBackLib" accept="image/*" hidden />
+
+      <div class="scan-live" id="scanLiveWrap" hidden>
+        <video id="scanVideo" playsinline muted></video>
+        <canvas id="scanCanvas" hidden></canvas>
+        <div class="scan-hint">Đưa QR trên CCCD vào khung</div>
+      </div>
+      <div class="actions tight">
+        <button type="button" class="btn btn-gold" id="btnScanQrLive">▣ Quét QR trên CCCD</button>
+        <button type="button" class="btn btn-ghost" id="btnStopScan" hidden>Dừng quét</button>
+      </div>
+      <div class="hint" id="hintQr">QR CCCD nằm góc trên phải mặt trước (chip). Nếu không đọc được vẫn có thể tiếp tục.</div>
+      <div class="actions">
+        <button type="button" class="btn btn-teal" id="btnStep1Next">Tiếp tục →</button>
+        <button type="button" class="btn btn-ghost" id="btnSkipCccd">Bỏ qua</button>
+      </div>
+    </section>
+
+    <!-- STEP 2: PERSONAL -->
+    <section class="step" id="step2" data-step="2" hidden>
+      <h2>Thông tin cá nhân</h2>
+      <div class="account-readonly" id="stepAccountId">ID: —</div>
+
+      <div class="form-group">
+        <label for="inputName">Họ và tên <span class="req">*</span></label>
+        <input id="inputName" type="text" placeholder="Nguyễn Văn A" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label for="inputDob">Ngày sinh <span class="req">*</span></label>
+        <input id="inputDob" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="inputGender">Giới tính</label>
+        <select id="inputGender">
+          <option value="">—</option>
+          <option value="Nam">Nam</option>
+          <option value="Nữ">Nữ</option>
+          <option value="Khác">Khác</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="inputAddress">Nơi ở / Địa chỉ <span class="req">*</span></label>
+        <textarea id="inputAddress" placeholder="Số nhà, đường, phường/xã…"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="inputCountry">Quốc gia <span class="req">*</span></label>
+        <input id="inputCountry" type="text" list="countryList" placeholder="Việt Nam" />
+        <datalist id="countryList">
+          <option value="Việt Nam"></option>
+          <option value="United States"></option>
+          <option value="Japan"></option>
+          <option value="South Korea"></option>
+          <option value="China"></option>
+          <option value="France"></option>
+          <option value="Germany"></option>
+          <option value="Australia"></option>
+          <option value="Singapore"></option>
+          <option value="Thailand"></option>
+          <option value="United Kingdom"></option>
+          <option value="Canada"></option>
+        </datalist>
+      </div>
+      <div class="form-group" id="provinceGroup">
+        <label for="inputProvince">Tỉnh / Thành phố <span class="req">*</span></label>
+        <select id="inputProvince"></select>
+        <input id="inputProvinceText" type="text" placeholder="Tỉnh/thành" hidden />
+      </div>
+      <div class="form-group">
+        <label for="inputCccd">Số CCCD <em>(hoặc hộ chiếu)</em> <span class="req">*</span></label>
+        <input id="inputCccd" type="text" inputmode="numeric" maxlength="12" placeholder="079123456789" />
+        <div class="hint" id="hintCccd">Nhập ít nhất CCCD hoặc số hộ chiếu</div>
+      </div>
+      <div class="form-group">
+        <label for="inputPassport">Số hộ chiếu <em>(hoặc CCCD)</em> <span class="req">*</span></label>
+        <input id="inputPassport" type="text" maxlength="9" placeholder="C1234567" style="text-transform:uppercase" />
+      </div>
+      <div class="form-group">
+        <label for="inputOldCmnd">Số CMND cũ</label>
+        <input id="inputOldCmnd" type="text" maxlength="12" placeholder="(từ QR CCCD nếu có)" />
+      </div>
+      <div class="form-group">
+        <label for="inputCccdIssue">Ngày cấp CCCD</label>
+        <input id="inputCccdIssue" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="inputPhone">Số điện thoại</label>
+        <input id="inputPhone" type="tel" inputmode="tel" placeholder="09xxxxxxxx" />
+      </div>
+      <div class="form-group">
+        <label>Ảnh chân dung <em>(tuỳ chọn)</em></label>
+        <button type="button" class="btn btn-ghost btn-block" id="btnPhoto">🖼️ Chọn từ thư viện</button>
+        <input type="file" id="photoInput" accept="image/*" hidden />
+        <img id="photoPreview" alt="" class="mini-preview" hidden />
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-teal" id="btnStep2Next">Tiếp tục →</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: FACE -->
+    <section class="step" id="step3" data-step="3" hidden>
+      <h2>Nhận diện khuôn mặt</h2>
+      <p class="step-desc">Căn mặt vào oval, chụp selfie. Có thể bỏ qua.</p>
+      <div class="selfie-wrap" id="selfieWrap">
+        <video id="selfieVideo" playsinline muted></video>
+        <canvas id="selfieCanvas" style="display:none"></canvas>
+        <div class="selfie-oval" aria-hidden="true"></div>
+        <img id="selfiePreview" alt="Selfie" hidden />
+      </div>
+      <div class="hint" id="hintFace">FaceDetector dùng khi trình duyệt hỗ trợ — không bắt buộc</div>
+      <div class="actions tight">
+        <button type="button" class="btn btn-teal" id="btnSelfieCam">📷 Bật camera trước</button>
+        <button type="button" class="btn btn-gold" id="btnSelfieSnap" disabled>Chụp</button>
+        <button type="button" class="btn btn-ghost" id="btnSelfieRetake" hidden>Chụp lại</button>
+        <button type="button" class="btn btn-ghost" id="btnSelfieFile">📁 Chọn ảnh</button>
+        <input type="file" id="inputSelfieFile" accept="image/*" capture="user" hidden />
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-gold" id="btnFinishSave">🔐 Hoàn tất &amp; Lưu</button>
+        <button type="button" class="btn btn-ghost" id="btnSkipFace">Bỏ qua</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/vendor/qrcode.js"></script>
+  <script src="/vendor/jsQR.js"></script>
+  <script src="/vendor/html2canvas.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
